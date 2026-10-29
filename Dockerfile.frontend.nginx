@@ -1,0 +1,12 @@
+# Usando una imagen base ligera de Nginx
+FROM nginx:alpine
+
+# Copiar los archivos de la aplicación React (carpeta 'dist') a la carpeta de documentos de Nginx
+COPY dist/ /usr/share/nginx/html/
+
+# Opcional: Copiar un archivo de configuración personalizado de Nginx si es necesario
+# Por ejemplo, si la app es una SPA (Single Page Application) y necesitas reescribir rutas:
+# COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Exponer el puerto 80
+EXPOSE 80

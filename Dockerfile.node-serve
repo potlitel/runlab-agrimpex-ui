@@ -1,0 +1,43 @@
+# Fase de construcción
+FROM node:22-alpine AS build
+
+# Configurar proxy
+ENV HTTP_PROXY=http://172.16.65.61:3128
+ENV HTTPS_PROXY=http://172.16.65.61:3128
+ENV NO_PROXY=localhost,127.0.0.1,::1
+
+WORKDIR /app
+
+# Copiar package.json
+COPY package.json ./
+
+# Instalar dependencias
+RUN yarn install --network-timeout 600000
+
+# Copiar el resto del código
+COPY . .
+
+# Construir la aplicación
+RUN yarn build
+
+# Fase de ejecución - servir archivos estáticos con node
+FROM node:22-alpine AS runner
+
+# Configurar proxy
+ENV HTTP_PROXY=http://172.16.65.61:3128
+ENV HTTPS_PROXY=http://172.16.65.61:3128
+ENV NO_PROXY=localhost,127.0.0.1,::1
+
+WORKDIR /app
+
+# Instalar serve para servir archivos estáticos
+RUN yarn global add serve
+
+# Copiar archivos construidos
+COPY --from=build /app/dist ./dist
+
+# Exponer puerto
+EXPOSE 3000
+
+# Servir archivos estáticos
+CMD ["serve", "-s", "dist", "-l", "3000"]
