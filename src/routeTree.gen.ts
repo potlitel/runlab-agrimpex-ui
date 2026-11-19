@@ -10,6 +10,14 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DataRouteImport } from './routes/data'
+import { Route as DockerRouteImport } from './routes/docker'
+import { Route as EnvRouteImport } from './routes/env'
+import { Route as ErrorsRouteImport } from './routes/errors'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as SchedulesRouteImport } from './routes/schedules'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TestsRouteImport } from './routes/tests'
 import { Route as errors401RouteImport } from './routes/(errors)/401'
 import { Route as errors403RouteImport } from './routes/(errors)/403'
 import { Route as errors404RouteImport } from './routes/(errors)/404'
@@ -19,6 +27,46 @@ import { Route as errors503RouteImport } from './routes/(errors)/503'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DataRoute = DataRouteImport.update({
+  id: '/data',
+  path: '/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DockerRoute = DockerRouteImport.update({
+  id: '/docker',
+  path: '/docker',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EnvRoute = EnvRouteImport.update({
+  id: '/env',
+  path: '/env',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ErrorsRoute = ErrorsRouteImport.update({
+  id: '/errors',
+  path: '/errors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SchedulesRoute = SchedulesRouteImport.update({
+  id: '/schedules',
+  path: '/schedules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestsRoute = TestsRouteImport.update({
+  id: '/tests',
+  path: '/tests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const errors401Route = errors401RouteImport.update({
@@ -49,6 +97,14 @@ const errors503Route = errors503RouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/data': typeof DataRoute
+  '/docker': typeof DockerRoute
+  '/env': typeof EnvRoute
+  '/errors': typeof ErrorsRoute
+  '/reports': typeof ReportsRoute
+  '/schedules': typeof SchedulesRoute
+  '/settings': typeof SettingsRoute
+  '/tests': typeof TestsRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
   '/404': typeof errors404Route
@@ -57,6 +113,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/data': typeof DataRoute
+  '/docker': typeof DockerRoute
+  '/env': typeof EnvRoute
+  '/errors': typeof ErrorsRoute
+  '/reports': typeof ReportsRoute
+  '/schedules': typeof SchedulesRoute
+  '/settings': typeof SettingsRoute
+  '/tests': typeof TestsRoute
   '/401': typeof errors401Route
   '/403': typeof errors403Route
   '/404': typeof errors404Route
@@ -66,6 +130,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/data': typeof DataRoute
+  '/docker': typeof DockerRoute
+  '/env': typeof EnvRoute
+  '/errors': typeof ErrorsRoute
+  '/reports': typeof ReportsRoute
+  '/schedules': typeof SchedulesRoute
+  '/settings': typeof SettingsRoute
+  '/tests': typeof TestsRoute
   '/(errors)/401': typeof errors401Route
   '/(errors)/403': typeof errors403Route
   '/(errors)/404': typeof errors404Route
@@ -74,12 +146,48 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/401' | '/403' | '/404' | '/500' | '/503'
+  fullPaths:
+    | '/'
+    | '/data'
+    | '/docker'
+    | '/env'
+    | '/errors'
+    | '/reports'
+    | '/schedules'
+    | '/settings'
+    | '/tests'
+    | '/401'
+    | '/403'
+    | '/404'
+    | '/500'
+    | '/503'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/401' | '/403' | '/404' | '/500' | '/503'
+  to:
+    | '/'
+    | '/data'
+    | '/docker'
+    | '/env'
+    | '/errors'
+    | '/reports'
+    | '/schedules'
+    | '/settings'
+    | '/tests'
+    | '/401'
+    | '/403'
+    | '/404'
+    | '/500'
+    | '/503'
   id:
     | '__root__'
     | '/'
+    | '/data'
+    | '/docker'
+    | '/env'
+    | '/errors'
+    | '/reports'
+    | '/schedules'
+    | '/settings'
+    | '/tests'
     | '/(errors)/401'
     | '/(errors)/403'
     | '/(errors)/404'
@@ -89,6 +197,14 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DataRoute: typeof DataRoute
+  DockerRoute: typeof DockerRoute
+  EnvRoute: typeof EnvRoute
+  ErrorsRoute: typeof ErrorsRoute
+  ReportsRoute: typeof ReportsRoute
+  SchedulesRoute: typeof SchedulesRoute
+  SettingsRoute: typeof SettingsRoute
+  TestsRoute: typeof TestsRoute
   errors401Route: typeof errors401Route
   errors403Route: typeof errors403Route
   errors404Route: typeof errors404Route
@@ -103,6 +219,62 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/data': {
+      id: '/data'
+      path: '/data'
+      fullPath: '/data'
+      preLoaderRoute: typeof DataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docker': {
+      id: '/docker'
+      path: '/docker'
+      fullPath: '/docker'
+      preLoaderRoute: typeof DockerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/env': {
+      id: '/env'
+      path: '/env'
+      fullPath: '/env'
+      preLoaderRoute: typeof EnvRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/errors': {
+      id: '/errors'
+      path: '/errors'
+      fullPath: '/errors'
+      preLoaderRoute: typeof ErrorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/schedules': {
+      id: '/schedules'
+      path: '/schedules'
+      fullPath: '/schedules'
+      preLoaderRoute: typeof SchedulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tests': {
+      id: '/tests'
+      path: '/tests'
+      fullPath: '/tests'
+      preLoaderRoute: typeof TestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(errors)/401': {
@@ -145,6 +317,14 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DataRoute: DataRoute,
+  DockerRoute: DockerRoute,
+  EnvRoute: EnvRoute,
+  ErrorsRoute: ErrorsRoute,
+  ReportsRoute: ReportsRoute,
+  SchedulesRoute: SchedulesRoute,
+  SettingsRoute: SettingsRoute,
+  TestsRoute: TestsRoute,
   errors401Route: errors401Route,
   errors403Route: errors403Route,
   errors404Route: errors404Route,
