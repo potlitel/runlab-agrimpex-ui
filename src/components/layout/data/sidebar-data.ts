@@ -8,6 +8,7 @@ import {
   CalendarClock,
   Database,
   Settings,
+  Workflow,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -38,6 +39,11 @@ export const sidebarData: SidebarData = {
     {
       title: 'Ejecución',
       items: [
+        {
+          title: 'Flujo en vivo',
+          url: '/live-flow',
+          icon: Workflow,
+        },
         {
           title: 'Tests',
           url: '/tests',

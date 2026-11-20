@@ -1,10 +1,12 @@
+import { Link } from '@tanstack/react-router'
+import { Workflow } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
 import { useProfileStore } from '@/stores/profileStore'
 import { ExecutionConsole } from './components/execution-console'
-import { RealtimeExecutionOnboarding } from './components/realtime-onboarding'
 import { ResultsTable } from './components/results-table'
 import { useExecution } from './use-execution'
 
@@ -46,7 +48,15 @@ function ExecutionDashboardView({ profileName }: { profileName?: string }) {
       </Header>
       <Main>
         <div className='space-y-4'>
-          <RealtimeExecutionOnboarding />
+          <div className='flex flex-col gap-3 rounded-lg border border-dashed bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between'>
+            <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+              <Workflow className='size-4 text-primary' />
+              <span>Consulta la guía visual de cómo funciona la ejecución en tiempo real.</span>
+            </div>
+            <Button variant='outline' size='sm' asChild>
+              <Link to='/live-flow'>Ver flujo en vivo</Link>
+            </Button>
+          </div>
           <ExecutionConsole
             logs={execution.logs}
             progress={execution.progress}

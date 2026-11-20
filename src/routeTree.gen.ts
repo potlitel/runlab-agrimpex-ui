@@ -14,6 +14,7 @@ import { Route as DataRouteImport } from './routes/data'
 import { Route as DockerRouteImport } from './routes/docker'
 import { Route as EnvRouteImport } from './routes/env'
 import { Route as ErrorsRouteImport } from './routes/errors'
+import { Route as LiveFlowRouteImport } from './routes/live-flow'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as SchedulesRouteImport } from './routes/schedules'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -47,6 +48,11 @@ const EnvRoute = EnvRouteImport.update({
 const ErrorsRoute = ErrorsRouteImport.update({
   id: '/errors',
   path: '/errors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveFlowRoute = LiveFlowRouteImport.update({
+  id: '/live-flow',
+  path: '/live-flow',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/docker': typeof DockerRoute
   '/env': typeof EnvRoute
   '/errors': typeof ErrorsRoute
+  '/live-flow': typeof LiveFlowRoute
   '/reports': typeof ReportsRoute
   '/schedules': typeof SchedulesRoute
   '/settings': typeof SettingsRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/docker': typeof DockerRoute
   '/env': typeof EnvRoute
   '/errors': typeof ErrorsRoute
+  '/live-flow': typeof LiveFlowRoute
   '/reports': typeof ReportsRoute
   '/schedules': typeof SchedulesRoute
   '/settings': typeof SettingsRoute
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/docker': typeof DockerRoute
   '/env': typeof EnvRoute
   '/errors': typeof ErrorsRoute
+  '/live-flow': typeof LiveFlowRoute
   '/reports': typeof ReportsRoute
   '/schedules': typeof SchedulesRoute
   '/settings': typeof SettingsRoute
@@ -152,6 +161,7 @@ export interface FileRouteTypes {
     | '/docker'
     | '/env'
     | '/errors'
+    | '/live-flow'
     | '/reports'
     | '/schedules'
     | '/settings'
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/docker'
     | '/env'
     | '/errors'
+    | '/live-flow'
     | '/reports'
     | '/schedules'
     | '/settings'
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/docker'
     | '/env'
     | '/errors'
+    | '/live-flow'
     | '/reports'
     | '/schedules'
     | '/settings'
@@ -201,6 +213,7 @@ export interface RootRouteChildren {
   DockerRoute: typeof DockerRoute
   EnvRoute: typeof EnvRoute
   ErrorsRoute: typeof ErrorsRoute
+  LiveFlowRoute: typeof LiveFlowRoute
   ReportsRoute: typeof ReportsRoute
   SchedulesRoute: typeof SchedulesRoute
   SettingsRoute: typeof SettingsRoute
@@ -247,6 +260,13 @@ declare module '@tanstack/react-router' {
       path: '/errors'
       fullPath: '/errors'
       preLoaderRoute: typeof ErrorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live-flow': {
+      id: '/live-flow'
+      path: '/live-flow'
+      fullPath: '/live-flow'
+      preLoaderRoute: typeof LiveFlowRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -321,6 +341,7 @@ const rootRouteChildren: RootRouteChildren = {
   DockerRoute: DockerRoute,
   EnvRoute: EnvRoute,
   ErrorsRoute: ErrorsRoute,
+  LiveFlowRoute: LiveFlowRoute,
   ReportsRoute: ReportsRoute,
   SchedulesRoute: SchedulesRoute,
   SettingsRoute: SettingsRoute,
