@@ -13,7 +13,6 @@ type TestExplorerProps = {
   tree?: TestTree
   loading: boolean
   error: string | null
-  running: boolean
   selected: string[]
   onToggleTest: (id: string) => void
   onToggleFile: (ids: string[], checked: boolean) => void
@@ -26,7 +25,6 @@ export function TestExplorer({
   tree,
   loading,
   error,
-  running,
   selected,
   onToggleTest,
   onToggleFile,
@@ -75,8 +73,13 @@ export function TestExplorer({
             <Button
               size='sm'
               variant='outline'
-              onClick={() => setFileToView('')}
-              title='Visualizar cualquier archivo del proyecto indicando su ruta relativa al projectPath'
+              onClick={() => {
+                const filesFromSelection = Array.from(
+                  new Set(selected.map((id) => id.split('::')[0]).filter(Boolean))
+                )
+                setFileToView(filesFromSelection.length === 1 ? filesFromSelection[0] : '')
+              }}
+              title='Visualizar cualquier archivo del proyecto indicando su ruta relativa al projectPath (si hay un único archivo seleccionado, se abre automáticamente)'
             >
               <FolderOpen className='size-4' />
               Ver archivo
@@ -85,7 +88,8 @@ export function TestExplorer({
               size='sm'
               variant='outline'
               onClick={onRefresh}
-              disabled={loading || running}
+              disabled={loading}
+              title='Refrescar catálogo desde el projectPath configurado (recolección Playwright)'
             >
               <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
               {loading ? 'Actualizando' : 'Actualizar'}

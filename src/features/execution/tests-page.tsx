@@ -107,9 +107,22 @@ function TestsPageView({
               <Button
                 size='sm'
                 variant='outline'
-                onClick={() => setFileToView('')}
+                onClick={() => {
+                  const filesFromSelection = Array.from(
+                    new Set(
+                      execution.selected
+                        .map((id) => id.split('::')[0])
+                        .filter(Boolean)
+                    )
+                  )
+                  setFileToView(filesFromSelection.length === 1 ? filesFromSelection[0] : '')
+                }}
                 disabled={!configured}
-                title={configured ? 'Abrir y visualizar cualquier archivo del proyecto (ruta relativa al projectPath)' : 'Configura el proyecto para visualizar archivos'}
+                title={
+                  configured
+                    ? 'Abrir y visualizar cualquier archivo del proyecto. Si hay tests seleccionados de un único archivo, se abre automáticamente.'
+                    : 'Configura el proyecto para visualizar archivos'
+                }
               >
                 <FolderOpen className='size-4' />
                 Ver archivo
@@ -133,7 +146,6 @@ function TestsPageView({
             tree={execution.tree}
             loading={execution.loading}
             error={execution.error}
-            running={execution.running}
             selected={execution.selected}
             onToggleTest={execution.toggleTest}
             onToggleFile={execution.toggleFile}
