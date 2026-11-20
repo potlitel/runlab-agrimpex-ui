@@ -1,4 +1,4 @@
-import { Settings } from 'lucide-react'
+import { Blocks, Bot, FolderKanban, ServerCog, Settings, Users } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
@@ -52,11 +52,26 @@ function SettingsPageView({ profileName }: { profileName?: string }) {
       <Main>
         <Tabs defaultValue='project' className='space-y-4'>
           <TabsList className='flex h-auto flex-wrap justify-start gap-1'>
-            <TabsTrigger value='project'>Proyecto</TabsTrigger>
-            <TabsTrigger value='features'>Módulos</TabsTrigger>
-            <TabsTrigger value='automation'>Automatización</TabsTrigger>
-            <TabsTrigger value='profiles'>Perfiles</TabsTrigger>
-            <TabsTrigger value='system'>Sistema</TabsTrigger>
+            <TabsTrigger value='project' className='gap-1.5'>
+              <FolderKanban className='size-4' />
+              Proyecto
+            </TabsTrigger>
+            <TabsTrigger value='features' className='gap-1.5'>
+              <Blocks className='size-4' />
+              Módulos
+            </TabsTrigger>
+            <TabsTrigger value='automation' className='gap-1.5'>
+              <Bot className='size-4' />
+              Automatización
+            </TabsTrigger>
+            <TabsTrigger value='profiles' className='gap-1.5'>
+              <Users className='size-4' />
+              Perfiles
+            </TabsTrigger>
+            <TabsTrigger value='system' className='gap-1.5'>
+              <ServerCog className='size-4' />
+              Sistema
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value='project' className='space-y-4'>
