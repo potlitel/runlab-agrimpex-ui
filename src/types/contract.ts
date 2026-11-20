@@ -40,6 +40,16 @@ export interface ProfilesStatusItem {
 }
 
 // ── Config ───────────────────────────────────────────────────────────────
+export interface ProjectMcpFeature {
+  detected: boolean
+  signals?: string[]
+}
+
+export interface ProjectFeatures {
+  mcp?: ProjectMcpFeature
+  [key: string]: unknown
+}
+
 export interface Config {
   projectPath?: string
   envPath?: string
@@ -49,6 +59,7 @@ export interface Config {
   seleniumRemoteUrl?: string
   errorImagesPath?: string
   jsonDataPath?: string
+  projectFeatures?: ProjectFeatures
   [key: string]: unknown
 }
 

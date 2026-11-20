@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { FolderKanban, FolderOpen, RefreshCw } from 'lucide-react'
+import { Bot, FolderKanban, FolderOpen, PlugZap, RefreshCw, Sparkles } from 'lucide-react'
 import { configApi } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -51,6 +51,8 @@ function TestsPageView({
   const projectPath = config?.projectPath?.trim() || ''
   const playwrightCmd = config?.playwrightCmd?.trim() || config?.pytestCmd?.trim() || ''
   const configured = !!projectPath
+  const mcpDetected = !!config?.projectFeatures?.mcp?.detected
+  const mcpSignals = config?.projectFeatures?.mcp?.signals ?? []
 
   return (
     <>
@@ -84,7 +86,44 @@ function TestsPageView({
                   <Badge variant={configured ? 'default' : 'destructive'}>
                     {configured ? 'Configurado' : 'Sin configurar'}
                   </Badge>
+                  {mcpDetected && (
+                    <div
+                      className='group relative inline-flex items-center gap-1.5 overflow-hidden rounded-full border border-cyan-400/40 bg-gradient-to-r from-cyan-500/15 via-violet-500/15 to-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-foreground shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_8px_24px_-12px_rgba(56,189,248,0.65)]'
+                      title={
+                        mcpSignals.length
+                          ? `Playwright MCP detectado (${mcpSignals.join(', ')})`
+                          : 'Playwright MCP detectado en el proyecto'
+                      }
+                    >
+                      <span className='pointer-events-none absolute inset-0 bg-[linear-gradient(110deg,transparent,rgba(255,255,255,0.35),transparent)] opacity-70 [transform:translateX(-120%)] animate-[mcp-shine_2.8s_ease-in-out_infinite]' />
+                      <span className='pointer-events-none absolute -inset-px rounded-full bg-gradient-to-r from-cyan-400/30 via-fuchsia-400/20 to-emerald-400/30 blur-[2px]' />
+                      <span className='relative inline-flex items-center gap-1.5'>
+                        <span className='relative flex size-5 items-center justify-center rounded-full bg-background/70 ring-1 ring-cyan-400/40'>
+                          <PlugZap className='size-3.5 text-cyan-500' />
+                          <Sparkles className='absolute -right-1 -top-1 size-2.5 animate-pulse text-fuchsia-500' />
+                        </span>
+                        <Bot className='size-3.5 text-violet-500' />
+                        <span className='bg-gradient-to-r from-cyan-600 via-violet-600 to-emerald-600 bg-clip-text text-transparent dark:from-cyan-300 dark:via-violet-300 dark:to-emerald-300'>
+                          MCP integrado
+                        </span>
+                        <span className='inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-500/80' />
+                      </span>
+                    </div>
+                  )}
                 </div>
+                {mcpDetected && (
+                  <div className='flex flex-wrap items-center gap-2 text-xs'>
+                    <span className='inline-flex items-center gap-1 rounded-md border border-cyan-500/20 bg-cyan-500/5 px-2 py-0.5 text-cyan-700 dark:text-cyan-300'>
+                      <Sparkles className='size-3' />
+                      Proyecto listo para flujos con Playwright MCP
+                    </span>
+                    {mcpSignals.length > 0 && (
+                      <span className='truncate text-muted-foreground' title={mcpSignals.join(', ')}>
+                        Señales: <span className='font-mono'>{mcpSignals.slice(0, 2).join(', ')}{mcpSignals.length > 2 ? ` +${mcpSignals.length - 2}` : ''}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
                 <p className='truncate font-mono text-xs text-muted-foreground' title={projectPath || undefined}>
                   {configured ? projectPath : 'Configura la ruta del proyecto para habilitar la ejecución y la exploración de archivos.'}
                 </p>
@@ -180,6 +219,15 @@ function TestsPageView({
           if (!open) setFileToView(null)
         }}
       />
+      {mcpDetected && (
+        <style>{`
+          @keyframes mcp-shine {
+            0% { transform: translateX(-120%); }
+            60% { transform: translateX(120%); }
+            100% { transform: translateX(120%); }
+          }
+        `}</style>
+      )}
     </>
   )
 }
