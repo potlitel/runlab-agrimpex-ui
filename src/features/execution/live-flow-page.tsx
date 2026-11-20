@@ -1,16 +1,10 @@
-import { Badge } from '@/components/ui/badge'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
-import { useProfileStore } from '@/stores/profileStore'
+import { ProfileHeaderBadge } from '@/components/profile-header-badge'
 import { RealtimeExecutionOnboarding } from './components/realtime-onboarding'
 
 export function LiveFlowPage() {
-  const activeProfileId = useProfileStore((s) => s.activeProfileId)
-  const activeProfile = useProfileStore((s) =>
-    s.profiles.find((profile) => profile.id === activeProfileId)
-  )
-
   return (
     <>
       <Header fixed>
@@ -22,9 +16,7 @@ export function LiveFlowPage() {
             </p>
           </div>
           <div className='ms-auto flex items-center gap-2'>
-            <Badge variant='secondary'>
-              {activeProfile?.name ?? 'Sin perfil activo'}
-            </Badge>
+            <ProfileHeaderBadge />
             <HeaderTools />
           </div>
         </div>

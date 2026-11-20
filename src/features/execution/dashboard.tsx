@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
+import { ProfileHeaderBadge } from '@/components/profile-header-badge'
 import { useProfileStore } from '@/stores/profileStore'
 import { ExecutionConsole } from './components/execution-console'
 import { ResultsTable } from './components/results-table'
@@ -38,9 +39,7 @@ function ExecutionDashboardView({ profileName }: { profileName?: string }) {
             </p>
           </div>
           <div className='ms-auto flex items-center gap-2'>
-            <Badge variant='secondary'>
-              {profileName ?? 'Sin perfil activo'}
-            </Badge>
+            <ProfileHeaderBadge profileName={profileName} />
             {execution.running && <Badge>En ejecución</Badge>}
             <HeaderTools />
           </div>

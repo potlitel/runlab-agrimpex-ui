@@ -1,9 +1,9 @@
 import { Settings2 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
+import { ProfileHeaderBadge } from '@/components/profile-header-badge'
 import { useProfileStore } from '@/stores/profileStore'
 import { AutomationSection } from './components/automation-section'
 import { ConfigSection } from './components/config-section'
@@ -44,7 +44,7 @@ function SettingsPageView({ profileName }: { profileName?: string }) {
             </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
-            <Badge variant='secondary'>{profileName ?? 'Sin perfil activo'}</Badge>
+            <ProfileHeaderBadge profileName={profileName} />
             <HeaderTools />
           </div>
         </div>

@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Plus, RefreshCw } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
+import { ProfileHeaderBadge } from '@/components/profile-header-badge'
 import { useProfileStore } from '@/stores/profileStore'
 import type { Schedule } from '@/types/contract'
 import { ScheduleActivityPanel } from './components/schedule-activity'
@@ -53,7 +53,7 @@ function SchedulesPageView({ profileName }: { profileName?: string }) {
             </p>
           </div>
           <div className='ms-auto flex items-center gap-2'>
-            <Badge variant='secondary'>{profileName ?? 'Sin perfil activo'}</Badge>
+            <ProfileHeaderBadge profileName={profileName} />
             <Button size='sm' variant='outline' onClick={schedules.refresh}>
               <RefreshCw className='size-4' /> Actualizar
             </Button>

@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
+import { ProfileHeaderBadge } from '@/components/profile-header-badge'
 import { useProfileStore } from '@/stores/profileStore'
 import { TestExplorer } from './components/test-explorer'
 import { TestFileDialog } from './components/test-file-dialog'
@@ -65,9 +66,7 @@ function TestsPageView({
             </p>
           </div>
           <div className='ms-auto flex flex-wrap items-center gap-2'>
-            <Badge variant='secondary'>
-              {profileName ?? 'Sin perfil activo'}
-            </Badge>
+            <ProfileHeaderBadge profileName={profileName} />
             {execution.running && <Badge>En ejecución</Badge>}
             <HeaderTools />
           </div>

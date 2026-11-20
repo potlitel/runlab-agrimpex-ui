@@ -1,11 +1,11 @@
 import { RefreshCw } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
+import { ProfileHeaderBadge } from '@/components/profile-header-badge'
 import { useProfileStore } from '@/stores/profileStore'
 import { EnvFilePanel } from './components/env-file-panel'
 import { SavedEntornosPanel } from './components/saved-entornos-panel'
@@ -39,7 +39,7 @@ function EnvironmentPageView({ profileName }: { profileName?: string }) {
             </p>
           </div>
           <div className='ms-auto flex items-center gap-2'>
-            <Badge variant='secondary'>{profileName ?? 'Sin perfil activo'}</Badge>
+            <ProfileHeaderBadge profileName={profileName} />
             <Button size='sm' variant='outline' onClick={env.refresh} disabled={env.filesLoading || env.savedLoading}>
               <RefreshCw className={env.filesLoading || env.savedLoading ? 'size-4 animate-spin' : 'size-4'} />
               Actualizar
