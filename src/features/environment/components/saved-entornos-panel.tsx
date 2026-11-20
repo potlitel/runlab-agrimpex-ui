@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -43,6 +44,7 @@ export function SavedEntornosPanel({
 }: SavedEntornosPanelProps) {
   const names = Object.keys(entornos)
   const [newName, setNewName] = useState('')
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   function handleCreate() {
     const name = newName.trim()
@@ -60,10 +62,13 @@ export function SavedEntornosPanel({
 
   function handleDelete() {
     if (!selectedName) return
-    const ok = window.confirm(
-      `¿Eliminar el entorno "${selectedName}"? Esta acción no se puede deshacer.`
-    )
-    if (ok) onDelete(selectedName)
+    setConfirmDeleteOpen(true)
+  }
+
+  function confirmDelete() {
+    if (!selectedName) return
+    onDelete(selectedName)
+    setConfirmDeleteOpen(false)
   }
 
   return (
@@ -128,6 +133,21 @@ export function SavedEntornosPanel({
               onSave={onSave}
               onRename={handleRename}
               onDelete={handleDelete}
+            />
+            <ConfirmDialog
+              open={confirmDeleteOpen}
+              onOpenChange={setConfirmDeleteOpen}
+              title='Eliminar entorno'
+              desc={
+                selectedName
+                  ? `¿Eliminar el entorno "${selectedName}"? Esta acción no se puede deshacer.`
+                  : ''
+              }
+              confirmText='Eliminar'
+              cancelBtnText='Cancelar'
+              destructive
+              isLoading={!!selectedName && deletingName === selectedName}
+              handleConfirm={confirmDelete}
             />
           </>
         )}

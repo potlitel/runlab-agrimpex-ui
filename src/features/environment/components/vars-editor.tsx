@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -25,6 +27,7 @@ function normalize(vars: EnvVar[]): EnvVar[] {
 
 export function VarsEditor({ vars, onChange, disabled }: VarsEditorProps) {
   const rows = normalize(vars)
+  const [pendingDelete, setPendingDelete] = useState<{ index: number; label: string } | null>(null)
 
   function update(index: number, patch: Partial<EnvVar>) {
     const next = rows.slice()
@@ -32,8 +35,19 @@ export function VarsEditor({ vars, onChange, disabled }: VarsEditorProps) {
     onChange(next)
   }
 
-  function remove(index: number) {
+  function requestRemove(index: number) {
+    const row = rows[index]
+    const label = row?.isComment
+      ? `el comentario${row.comment ? ` "${row.comment}"` : ''}`
+      : `la variable${row?.key ? ` "${row.key}"` : ''}`
+    setPendingDelete({ index, label })
+  }
+
+  function confirmRemove() {
+    if (pendingDelete == null) return
+    const { index } = pendingDelete
     onChange(rows.filter((_, i) => i !== index))
+    setPendingDelete(null)
   }
 
   function addVar() {
@@ -103,7 +117,7 @@ export function VarsEditor({ vars, onChange, disabled }: VarsEditorProps) {
                       size='icon'
                       variant='ghost'
                       disabled={disabled}
-                      onClick={() => remove(index)}
+                      onClick={() => requestRemove(index)}
                       aria-label='Eliminar fila'
                     >
                       <Trash2 className='size-4 text-muted-foreground' />
@@ -123,6 +137,21 @@ export function VarsEditor({ vars, onChange, disabled }: VarsEditorProps) {
           <Plus className='size-4' /> Comentario
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete != null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title='Eliminar elemento'
+        desc={
+          pendingDelete
+            ? `¿Eliminar ${pendingDelete.label}? Esta acción quitará el elemento (Clave/Comentario y Valor) del listado.`
+            : ''
+        }
+        confirmText='Eliminar'
+        cancelBtnText='Cancelar'
+        destructive
+        handleConfirm={confirmRemove}
+      />
     </div>
   )
 }
