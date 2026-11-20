@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight, CircleHelp, Container, Info, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -15,6 +15,11 @@ import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import type { Schedule, TestTree } from '@/types/contract'
 
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -113,6 +118,11 @@ function ScheduleFormInner({
   const files = useMemo(() => testsTree?.files ?? {}, [testsTree])
   const fileNames = useMemo(() => Object.keys(files).sort(), [files])
   const allTestIds = useMemo(() => fileNames.flatMap((f) => files[f] ?? []), [fileNames, files])
+  const hasSpecSelected = useMemo(
+    () => testIds.some((id) => /\.spec\.ts(?::|$)/i.test(id)),
+    [testIds]
+  )
+  const schedulesWholeSuite = !hasSpecSelected
 
   function toggleDay(day: number) {
     setDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
@@ -194,9 +204,28 @@ function ScheduleFormInner({
               <label className='flex items-center gap-2 text-sm'>
                 <Switch checked={enabled} onCheckedChange={setEnabled} /> Habilitada
               </label>
-              <label className='flex items-center gap-2 text-sm'>
-                <Switch checked={useDocker} onCheckedChange={setUseDocker} /> Usar Docker
-              </label>
+              <div className='flex items-center gap-1.5 text-sm'>
+                <label className='flex cursor-pointer items-center gap-2'>
+                  <Switch checked={useDocker} onCheckedChange={setUseDocker} /> Usar Docker
+                </label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type='button'
+                      className='inline-flex text-muted-foreground hover:text-foreground'
+                      aria-label='Información sobre Usar Docker'
+                    >
+                      <CircleHelp className='size-4' />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side='top' className='max-w-xs'>
+                    <span className='flex items-center gap-2'>
+                      <Container className='size-4 shrink-0' />
+                      Ejecuta la programación dentro de un contenedor Docker configurado para el proyecto.
+                    </span>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
 
             <div className='space-y-1.5'>
@@ -220,9 +249,28 @@ function ScheduleFormInner({
               <div className='flex items-center justify-between gap-2'>
                 <Label>Tests ({testIds.length} seleccionados)</Label>
                 <div className='flex gap-2'>
-                  <Button type='button' size='sm' variant='outline' onClick={onCollectTests} disabled={collectingTests}>
-                    <RefreshCw className={collectingTests ? 'size-4 animate-spin' : 'size-4'} /> Actualizar catálogo
-                  </Button>
+                  <div className='flex items-center gap-1.5'>
+                    <Button type='button' size='sm' variant='outline' onClick={onCollectTests} disabled={collectingTests}>
+                      <RefreshCw className={collectingTests ? 'size-4 animate-spin' : 'size-4'} /> Actualizar catálogo
+                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type='button'
+                          className='inline-flex text-muted-foreground hover:text-foreground'
+                          aria-label='Información sobre Actualizar catálogo'
+                        >
+                          <CircleHelp className='size-4' />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side='top' className='max-w-xs'>
+                        <span className='flex items-center gap-2'>
+                          <RefreshCw className='size-4 shrink-0' />
+                          Vuelve a recopilar el catálogo de tests del proyecto para mostrar los archivos y casos disponibles.
+                        </span>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   {allTestIds.length > 0 && (
                     <Button
                       type='button'
@@ -235,6 +283,14 @@ function ScheduleFormInner({
                   )}
                 </div>
               </div>
+              {schedulesWholeSuite && (
+                <div className='flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200'>
+                  <Info className='mt-0.5 size-4 shrink-0' />
+                  <p>
+                    No se ha seleccionado ningún fichero <span className='font-mono'>.spec.ts</span>. Se programará la ejecución de toda la suite.
+                  </p>
+                </div>
+              )}
               <div className='max-h-56 overflow-auto rounded-md border p-2'>
                 {testsLoading ? (
                   <p className='p-2 text-sm text-muted-foreground'>Cargando catálogo…</p>
