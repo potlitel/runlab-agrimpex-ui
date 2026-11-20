@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
+  Bug,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -147,11 +148,14 @@ function FailureEvidenceView({ profileName }: { profileName?: string }) {
     <>
       <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
-          <div>
-            <h1 className='text-xl font-semibold tracking-tight'>Evidencia de fallos</h1>
-            <p className='text-sm text-muted-foreground'>
-              Capturas y artefactos de fallos (carpeta configurada y reportes de ejecución)
-            </p>
+          <div className='flex items-center gap-2'>
+            <Bug className='size-5 text-muted-foreground' />
+            <div>
+              <h1 className='text-xl font-semibold tracking-tight'>Evidencia de fallos</h1>
+              <p className='text-sm text-muted-foreground'>
+                Capturas y artefactos de fallos (carpeta configurada y reportes de ejecución)
+              </p>
+            </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
             <ProfileHeaderBadge profileName={profileName} />

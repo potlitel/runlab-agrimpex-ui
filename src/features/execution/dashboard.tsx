@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Workflow } from 'lucide-react'
+import { LayoutDashboard, Workflow } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Header } from '@/components/layout/header'
@@ -32,11 +32,14 @@ function ExecutionDashboardView({ profileName }: { profileName?: string }) {
     <>
       <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
-          <div>
-            <h1 className='text-xl font-semibold tracking-tight'>Dashboard</h1>
-            <p className='text-sm text-muted-foreground'>
-              Consola de ejecución en vivo
-            </p>
+          <div className='flex items-center gap-2'>
+            <LayoutDashboard className='size-5 text-muted-foreground' />
+            <div>
+              <h1 className='text-xl font-semibold tracking-tight'>Dashboard</h1>
+              <p className='text-sm text-muted-foreground'>
+                Consola de ejecución en vivo
+              </p>
+            </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
             <ProfileHeaderBadge profileName={profileName} />

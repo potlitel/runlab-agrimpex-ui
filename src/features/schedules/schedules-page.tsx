@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, RefreshCw } from 'lucide-react'
+import { CalendarClock, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Header } from '@/components/layout/header'
@@ -46,11 +46,14 @@ function SchedulesPageView({ profileName }: { profileName?: string }) {
     <>
       <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
-          <div>
-            <h1 className='text-xl font-semibold tracking-tight'>Calendarización</h1>
-            <p className='text-sm text-muted-foreground'>
-              Programaciones automáticas de ejecuciones
-            </p>
+          <div className='flex items-center gap-2'>
+            <CalendarClock className='size-5 text-muted-foreground' />
+            <div>
+              <h1 className='text-xl font-semibold tracking-tight'>Calendarización</h1>
+              <p className='text-sm text-muted-foreground'>
+                Programaciones automáticas de ejecuciones
+              </p>
+            </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
             <ProfileHeaderBadge profileName={profileName} />

@@ -1,3 +1,4 @@
+import { Database } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Header } from '@/components/layout/header'
@@ -36,11 +37,14 @@ function TestDataPageView({ profileName }: { profileName?: string }) {
     <>
       <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
-          <div>
-            <h1 className='text-xl font-semibold tracking-tight'>Datos de prueba</h1>
-            <p className='text-sm text-muted-foreground'>
-              Fuentes TXT y JSON configuradas para el perfil activo
-            </p>
+          <div className='flex items-center gap-2'>
+            <Database className='size-5 text-muted-foreground' />
+            <div>
+              <h1 className='text-xl font-semibold tracking-tight'>Datos de prueba</h1>
+              <p className='text-sm text-muted-foreground'>
+                Fuentes TXT y JSON configuradas para el perfil activo
+              </p>
+            </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
             <ProfileHeaderBadge profileName={profileName} />

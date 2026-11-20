@@ -1,4 +1,4 @@
-import { Settings2 } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
@@ -35,7 +35,7 @@ function SettingsPageView({ profileName }: { profileName?: string }) {
       <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
           <div className='flex items-center gap-2'>
-            <Settings2 className='size-5 text-muted-foreground' />
+            <Settings className='size-5 text-muted-foreground' />
             <div>
               <h1 className='text-xl font-semibold tracking-tight'>Ajustes</h1>
               <p className='text-sm text-muted-foreground'>

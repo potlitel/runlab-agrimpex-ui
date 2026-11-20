@@ -1,4 +1,4 @@
-import { ExternalLink, RefreshCw } from 'lucide-react'
+import { Container, ExternalLink, RefreshCw } from 'lucide-react'
 import { dockerApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -34,11 +34,14 @@ function DockerPageView({ profileName }: { profileName?: string }) {
     <>
       <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
-          <div>
-            <h1 className='text-xl font-semibold tracking-tight'>Docker</h1>
-            <p className='text-sm text-muted-foreground'>
-              Infraestructura, grid y acciones de ejecución
-            </p>
+          <div className='flex items-center gap-2'>
+            <Container className='size-5 text-muted-foreground' />
+            <div>
+              <h1 className='text-xl font-semibold tracking-tight'>Docker</h1>
+              <p className='text-sm text-muted-foreground'>
+                Infraestructura, grid y acciones de ejecución
+              </p>
+            </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
             <ProfileHeaderBadge profileName={profileName} />

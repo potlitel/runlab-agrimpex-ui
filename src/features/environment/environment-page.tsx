@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Variable } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -32,11 +32,14 @@ function EnvironmentPageView({ profileName }: { profileName?: string }) {
     <>
       <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
-          <div>
-            <h1 className='text-xl font-semibold tracking-tight'>Entornos</h1>
-            <p className='text-sm text-muted-foreground'>
-              Variables de entorno y configuraciones guardadas por perfil
-            </p>
+          <div className='flex items-center gap-2'>
+            <Variable className='size-5 text-muted-foreground' />
+            <div>
+              <h1 className='text-xl font-semibold tracking-tight'>Entornos</h1>
+              <p className='text-sm text-muted-foreground'>
+                Variables de entorno y configuraciones guardadas por perfil
+              </p>
+            </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
             <ProfileHeaderBadge profileName={profileName} />

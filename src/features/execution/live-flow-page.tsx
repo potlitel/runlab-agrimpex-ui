@@ -1,3 +1,4 @@
+import { Workflow } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
@@ -9,11 +10,14 @@ export function LiveFlowPage() {
     <>
       <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
-          <div>
-            <h1 className='text-xl font-semibold tracking-tight'>Flujo en vivo</h1>
-            <p className='text-sm text-muted-foreground'>
-              Guía visual de la ejecución en tiempo real con Playwright y Socket.io
-            </p>
+          <div className='flex items-center gap-2'>
+            <Workflow className='size-5 text-muted-foreground' />
+            <div>
+              <h1 className='text-xl font-semibold tracking-tight'>Flujo en vivo</h1>
+              <p className='text-sm text-muted-foreground'>
+                Guía visual de la ejecución en tiempo real con Playwright y Socket.io
+              </p>
+            </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
             <ProfileHeaderBadge />

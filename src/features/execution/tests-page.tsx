@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Bot, FolderKanban, FolderOpen, PlugZap, RefreshCw, Sparkles } from 'lucide-react'
+import { Bot, FlaskConical, FolderKanban, FolderOpen, PlugZap, RefreshCw, Sparkles } from 'lucide-react'
 import { configApi } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -59,11 +59,14 @@ function TestsPageView({
     <>
       <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
-          <div>
-            <h1 className='text-xl font-semibold tracking-tight'>Tests</h1>
-            <p className='text-sm text-muted-foreground'>
-              Explorador de specs y configuración de corrida
-            </p>
+          <div className='flex items-center gap-2'>
+            <FlaskConical className='size-5 text-muted-foreground' />
+            <div>
+              <h1 className='text-xl font-semibold tracking-tight'>Tests</h1>
+              <p className='text-sm text-muted-foreground'>
+                Explorador de specs y configuración de corrida
+              </p>
+            </div>
           </div>
           <div className='ms-auto flex flex-wrap items-center gap-2'>
             <ProfileHeaderBadge profileName={profileName} />

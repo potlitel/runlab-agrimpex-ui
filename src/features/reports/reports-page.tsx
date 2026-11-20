@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { BarChart3, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Header } from '@/components/layout/header'
@@ -36,11 +36,14 @@ function ReportsPageView({ profileName }: { profileName?: string }) {
     <>
       <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
-          <div>
-            <h1 className='text-xl font-semibold tracking-tight'>Reportes</h1>
-            <p className='text-sm text-muted-foreground'>
-              Historial, analítica y detalle de ejecuciones
-            </p>
+          <div className='flex items-center gap-2'>
+            <BarChart3 className='size-5 text-muted-foreground' />
+            <div>
+              <h1 className='text-xl font-semibold tracking-tight'>Reportes</h1>
+              <p className='text-sm text-muted-foreground'>
+                Historial, analítica y detalle de ejecuciones
+              </p>
+            </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
             <ProfileHeaderBadge profileName={profileName} />
