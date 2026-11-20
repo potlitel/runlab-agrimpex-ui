@@ -4,6 +4,7 @@ import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
 import { useProfileStore } from '@/stores/profileStore'
 import { ExecutionConsole } from './components/execution-console'
+import { RealtimeExecutionOnboarding } from './components/realtime-onboarding'
 import { ResultsTable } from './components/results-table'
 import { useExecution } from './use-execution'
 
@@ -26,7 +27,7 @@ function ExecutionDashboardView({ profileName }: { profileName?: string }) {
 
   return (
     <>
-      <Header>
+      <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
           <div>
             <h1 className='text-xl font-semibold tracking-tight'>Dashboard</h1>
@@ -45,6 +46,7 @@ function ExecutionDashboardView({ profileName }: { profileName?: string }) {
       </Header>
       <Main>
         <div className='space-y-4'>
+          <RealtimeExecutionOnboarding />
           <ExecutionConsole
             logs={execution.logs}
             progress={execution.progress}

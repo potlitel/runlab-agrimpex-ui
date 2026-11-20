@@ -34,7 +34,7 @@ function TestDataPageView({ profileName }: { profileName?: string }) {
 
   return (
     <>
-      <Header>
+      <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
           <div>
             <h1 className='text-xl font-semibold tracking-tight'>Datos de prueba</h1>

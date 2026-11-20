@@ -32,7 +32,7 @@ function SettingsPageView({ profileName }: { profileName?: string }) {
 
   return (
     <>
-      <Header>
+      <Header fixed>
         <div className='flex flex-1 items-center justify-between gap-3'>
           <div className='flex items-center gap-2'>
             <Settings2 className='size-5 text-muted-foreground' />

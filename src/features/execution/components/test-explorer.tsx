@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronRight, Eye, FileCode2, FolderOpen, RefreshCw, Search } from 'lucide-react'
+import { ChevronRight, Eye, FileCode2, FolderOpen, Info, RefreshCw, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -100,6 +100,16 @@ export function TestExplorer({
             placeholder='Buscar test o archivo…'
             className='h-8 ps-8'
           />
+        </div>
+        <div className='flex items-start gap-2 rounded-md border border-sky-500/20 bg-sky-500/5 p-2.5 text-xs text-muted-foreground'>
+          <Info className='mt-0.5 size-4 shrink-0 text-sky-600 dark:text-sky-400' />
+          <p>
+            <span className='font-medium text-foreground'>Recomendación:</span> usa{' '}
+            <span className='font-medium'>Actualizar</span> para refrescar el catálogo y sincronizarlo con el{' '}
+            <span className='font-mono'>projectPath</span> configurado, especialmente tras cambios de
+            proyecto/configuración o reinicios del proceso de la API. Esto evita ver specs desfasados y errores al abrir
+            archivos.
+          </p>
         </div>
         <div className='flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground'>
           <span>
