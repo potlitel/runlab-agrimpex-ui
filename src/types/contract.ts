@@ -309,6 +309,30 @@ export interface FeatureFlags {
 }
 
 // ── Errores (evidencia) ──────────────────────────────────────────────────
+export type EvidenceKind = 'image' | 'video' | 'trace' | 'context' | 'other'
+export type EvidenceSource = 'folder' | 'report'
+
+export interface EvidenceItem {
+  id: string
+  name: string
+  displayName?: string
+  kind: EvidenceKind
+  source: EvidenceSource
+  mtime?: number
+  timestamp?: string | null
+  size?: number | null
+  reportId?: string | null
+  reportTimestamp?: string | null
+  testId?: string | null
+  status?: string | null
+  assetPath?: string | null
+  contentType?: string | null
+  url: string
+  downloadUrl?: string
+  [key: string]: unknown
+}
+
+/** @deprecated usar EvidenceItem */
 export interface ErrorImage {
   name: string
   mtime: number
@@ -319,9 +343,14 @@ export interface ErrorImage {
 export interface ErrorImagesResponse {
   configured: boolean
   folder: string
-  images: ErrorImage[]
-  missing?: boolean
+  folderMissing?: boolean
+  /** Compatibilidad (imágenes de carpeta) */
+  images?: ErrorImage[]
+  items?: EvidenceItem[]
+  counts?: { total: number; folder: number; reports: number }
   error?: string
+  /** @deprecated usar folderMissing */
+  missing?: boolean
 }
 
 // ── Txt data ─────────────────────────────────────────────────────────────

@@ -190,6 +190,10 @@ export const errorsApi = {
   list: () => get<ErrorImagesResponse>('/errors/images'),
   get: () => get<ErrorImagesResponse>('/errors/images'),
   images: () => get<ErrorImagesResponse>('/errors/images'),
+  /** URL de archivo de evidencia en carpeta (imagen/video/trace/context) */
+  fileUrl: (name: string) =>
+    `${API_BASE_URL}/errors/file?name=${encodeURIComponent(name)}`,
+  /** @deprecated usar fileUrl */
   imageUrl: (name: string) =>
     `${API_BASE_URL}/errors/image?name=${encodeURIComponent(name)}`,
 }
