@@ -29,6 +29,17 @@ function formatDate(iso?: string | null) {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
 }
 
+function specSelectionInfo(testIds?: string[]) {
+  const ids = testIds ?? []
+  const specIds = ids.filter((id) => /\.spec\.ts(?::|$)/i.test(id))
+  const specFiles = new Set(specIds.map((id) => id.split('::')[0]))
+  return {
+    isWholeSuite: specIds.length === 0,
+    specTests: specIds.length,
+    specFiles: specFiles.size,
+  }
+}
+
 type Props = {
   schedules: Schedule[]
   loading: boolean
@@ -101,7 +112,22 @@ export function SchedulesList({
                   </TableCell>
                   <TableCell className='font-mono text-sm'>{s.time ?? '—'}</TableCell>
                   <TableCell className='max-w-[180px] text-xs'>{formatDays(s.days)}</TableCell>
-                  <TableCell>{(s.testIds ?? []).length}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const scope = specSelectionInfo(s.testIds)
+                      if (scope.isWholeSuite) {
+                        return <Badge variant='secondary'>Suite completa</Badge>
+                      }
+                      return (
+                        <div className='text-xs leading-tight'>
+                          <div className='font-medium'>{scope.specTests} test(s)</div>
+                          <div className='text-muted-foreground'>
+                            {scope.specFiles} archivo(s) .spec.ts
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </TableCell>
                   <TableCell className='text-xs'>{formatDate(s.nextRun)}</TableCell>
                   <TableCell className='text-xs'>{formatDate(s.lastRun)}</TableCell>
                   <TableCell>
