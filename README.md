@@ -1,52 +1,137 @@
 # RunLab Agrimpex — UI
 
-Frontend del dashboard QA para gestionar y ejecutar la suite Playwright de
-Agrimpex (backoffice Angular + API Symfony). React 19 + Vite + TanStack
-Router/Query/Table + shadcn/ui + Tailwind 4.
+Frontend del dashboard QA **RunLab Agrimpex** para gestionar perfiles, configurar proyectos de automatización, explorar/ejecutar tests Playwright y consultar resultados/evidencias.
 
-> **Línea base:** esqueleto UI de `DAM.Frontend.React` (plantilla
-> [shadcn-admin](https://github.com/satnaing/shadcn-admin), MIT © Sat Naing;
-> adaptaciones © potlitel). El contrato API/socket proviene del repo hermano
-> `runlab-agrimpex-api`, a su vez adaptado de
-> [QADash backend](https://github.com/hramses1/dash-backend) (MIT © hramses1).
+- **Stack:** React 19 + TypeScript + Vite + TanStack Router/Query/Table + shadcn/ui + Tailwind CSS 4.
+- **Backend hermano:** `runlab-agrimpex-api` (Express + Socket.io), que expone la API REST, emite eventos en tiempo real y sirve el build en producción.
+- **Línea base:** esqueleto UI de `DAM.Frontend.React` (plantilla [shadcn-admin](https://github.com/satnaing/shadcn-admin), MIT © Sat Naing; adaptaciones © potlitel).
 
 ## Arquitectura
 
+```text
+runlab-agrimpex-ui (React, dev :5173 / dist en prod)
+        │  HTTP /api  +  Socket.io (/socket.io)
+        ▼
+runlab-agrimpex-api (Express + Socket.io, :3001)
+        │
+        ├─ Perfiles/workspaces en disco (profiles/<id>/...)
+        ├─ Colección y ejecución Playwright sobre projectPath
+        └─ Reportes, entornos, Docker, schedules, datos y evidencia
+                │
+                ▼
+      Proyecto de automatización Playwright (AUT / suite)
 ```
-runlab-agrimpex-api   (Express + Socket.io :3001)  ←→  runlab-agrimpex-ui (React :5173 dev / dist en prod)
-        │                                                        │
-        └── spawn: npx playwright test <specs> ──→  playwright-kit-profesional (AUT: localhost:5000 / :8990)
-```
 
-- El backend sirve el build del frontend en producción (mismo puerto).
-- En desarrollo, Vite hace proxy de `/api` y `/socket.io` hacia `:3001`.
-- Sin auth en esta etapa (herramienta de red de confianza).
+- En desarrollo, Vite hace proxy de `/api` y `/socket.io` hacia `http://localhost:3001`.
+- En producción, el backend sirve el `dist` del frontend.
+- La sesión de trabajo opera por **perfil activo** (sin autenticación en esta etapa): la UI envía `X-Profile-Id` y se suscribe a la sala Socket.io `profile:<id>`.
 
-## Vistas
+## Requisitos
 
-Dashboard (árbol de tests + ejecución en vivo), Reportes (historial +
-analítica), Evidencia de fallos (screenshots/traces), Tests, Entornos (`.env`
-+ perfiles), Docker, Calendarización, Datos de prueba, Ajustes.
+- Node.js 18+
+- npm
+- API en ejecución (`runlab-agrimpex-api`, por defecto en `:3001`)
 
-## Comandos
+## Puesta en marcha
 
 ```bash
+# Instalar dependencias
 npm install
-npm run dev       # Vite en :5173 (requiere el API en :3001)
-npm run build     # tsc + vite build + gzip
+
+# Desarrollo
+npm run dev
+
+# Lint
+npm run lint
+
+# Typecheck
+npx tsc -b --noEmit
+
+# Build de producción
+npm run build
+
+# Vista previa del build
 npm run preview
 ```
 
-## Licencia
+> Si el backend corre en otro host/puerto, ajusta el proxy en `vite.config.ts` o define `VITE_API_URL` según corresponda.
 
-MIT — ver `LICENSE`. Atribuciones en el encabezado de este archivo.
+## Vistas principales
 
-## Convención de nombres de changes (OpenSpec)
+- **Dashboard (`/`)**: consola y resultados de la ejecución en vivo del perfil activo.
+- **Tests (`/tests`)**: proyecto de pruebas visible/configurado, catálogo de specs, configuración de corrida, consola/resultados y visor de archivos del proyecto.
+- **Reportes (`/reports`)**: historial, analítica y detalle de ejecuciones.
+- **Evidencia de fallos (`/errors`)**: galería de capturas/evidencias generadas durante corridas.
+- **Entornos (`/env`)**: edición de archivos `.env` del proyecto y entornos/variables guardados por perfil.
+- **Docker (`/docker`)**: estado del entorno Docker/grid y acciones asociadas.
+- **Calendarización (`/schedules`)**: programación de ejecuciones automáticas.
+- **Datos de prueba (`/data`)**: fuentes de datos TXT/JSON (según módulos habilitados).
+- **Ajustes (`/settings`)**: configuración de proyecto/rutas, módulos (feature flags), automatización, perfiles y sistema.
 
-Los changes en este repo siguen la convención: **el nombre del change = la capability principal que introduce** (sustantivo, kebab-case).
+## Header y herramientas globales
 
-| Change | Capability principal | Qué significa |
-|---|---|---|
-| `contract-client` | `contract-client` | Es la capa que **habla el contrato** (REST + Socket.io) con el backend. Sus 2 capabilities (`api-client`, `socket-client`) son **clientes del contrato** (contract clients). El nombre describe **qué es** (un cliente del contrato) no **qué hace** (fetch data, open socket), que es detalle de implementación. En OpenSpec el nombre del change coincide con la capability root del delta. |
+Las páginas principales mantienen herramientas de navegación/utilidad en el header:
 
-> **Regla práctica**: el nombre del change = sustantivo que nombra la capability principal (no verbos como `add-...` ni prefijos `feat-`). Sirve como clave de búsqueda en `openspec list`.
+- **Búsqueda / Command Menu** (`Ctrl+K` / `⌘K`): acceso rápido a vistas y acciones como cambio de tema.
+- **Cambio de tema**: claro, oscuro o sistema.
+- **Ajustes visuales (rueda dentada)**: tema, layout, sidebar y dirección.
+
+Además, el sidebar incluye el selector de perfil activo y la navegación por secciones.
+
+## Tests: proyecto visible y visor de archivos
+
+En la vista `/tests`:
+
+- Se muestra de forma destacada el **proyecto de pruebas configurado** para el perfil activo (ruta `projectPath`, comando Playwright, projects y cantidad de tests del catálogo), con estado **Configurado / Sin configurar**.
+- El **catálogo** permite recolectar/actualizar specs, buscar, seleccionar tests/archivos y lanzar corridas con parámetros (project, grep, workers, fuente de variables, Docker, `params`).
+- El botón **Abrir archivo** (y la acción «Ver» por archivo del catálogo) abre un **visor de contenidos** para cualquier archivo del proyecto:
+  - Apertura por ruta relativa al `projectPath` configurado (p. ej. `playwright.config.ts`, `tests/...`).
+  - Metadatos (ruta, tamaño, fecha de modificación, líneas), búsqueda dentro del archivo, ajuste de línea, copiado de ruta/contenido y numeración de líneas.
+  - El contenido se obtiene vía `GET /api/tests/file?name=<ruta-relativa>` (lectura dentro del proyecto).
+
+> Si al ejecutar aparece «Project path not configured», configura el proyecto en **Ajustes > Proyecto** (ruta del proyecto y comando Playwright) y actualiza el catálogo.
+
+## Configuración del proyecto y `playwrightCmd`
+
+La configuración por perfil se gestiona en **Ajustes > Proyecto** (persistida por la API en `profiles/<id>/config.json`).
+
+Campos principales:
+
+- **Ruta del proyecto (`projectPath`)**: ruta absoluta al proyecto de automatización Playwright.
+- **Archivo .env (`envPath`)**: archivo de entorno del proyecto (opcional; también puede detectarse).
+- **Comando Playwright (`playwrightCmd`)**: **comando base** que la API usa para recolectar y ejecutar tests.
+  - **Valor recomendado:** `npx playwright`
+  - **Importante:** es el comando base, **sin** subcomando `test`; el backend agrega `test` y los argumentos necesarios:
+    - Colección: `<playwrightCmd> test --list --reporter=json`
+    - Ejecución: `<playwrightCmd> test <targets> [--project=...] [-g ...] [--workers=...] --reporter=line,json`
+  - Ejemplos válidos: `npx playwright`, `pnpm exec playwright` (según el entorno del proyecto).
+  - Si usas `npx playwright test` como base, el comando resultante será incorrecto (duplicará `test`).
+- **Comando Pytest (`pytestCmd`)**: campo **deprecado** mantenido por compatibilidad; para proyectos Playwright usa `playwrightCmd`.
+- Rutas opcionales de datos/evidencias y URL remota de Selenium/Grid según los módulos habilitados.
+
+## Estructura relevante del frontend
+
+```text
+src/
+  components/        # UI base, layout, header, theme/config/search
+  context/           # theme, layout, search, direction, font
+  features/
+    execution/       # dashboard, tests, catálogo, corrida, consola, visor de archivos
+    reports/         # historial y analítica
+    errors/          # evidencia de fallos
+    environment/     # archivos .env y entornos guardados
+    docker/          # control/estado Docker
+    schedules/       # calendarización
+    test-data/       # datos TXT/JSON
+    settings/        # configuración, módulos, automatización, perfiles, sistema
+    profile-session/ # sesión/perfil activo
+  lib/api.ts         # cliente API y contratos de endpoints
+  routes/            # rutas TanStack Router
+  stores/            # estado global (perfil, etc.)
+  types/contract.ts  # tipos del contrato con la API
+```
+
+## Notas
+
+- Los módulos disponibles pueden variar según los **feature flags** del perfil activo.
+- Algunas capacidades (ejecución real, Docker, rutas locales) dependen de la configuración del perfil y del entorno donde corre la API.

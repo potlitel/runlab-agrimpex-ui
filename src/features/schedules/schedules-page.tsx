@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Header } from '@/components/layout/header'
+import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
 import { useProfileStore } from '@/stores/profileStore'
 import type { Schedule } from '@/types/contract'
@@ -51,7 +52,7 @@ function SchedulesPageView({ profileName }: { profileName?: string }) {
               Programaciones automáticas de ejecuciones
             </p>
           </div>
-          <div className='flex items-center gap-2'>
+          <div className='ms-auto flex items-center gap-2'>
             <Badge variant='secondary'>{profileName ?? 'Sin perfil activo'}</Badge>
             <Button size='sm' variant='outline' onClick={schedules.refresh}>
               <RefreshCw className='size-4' /> Actualizar
@@ -59,6 +60,7 @@ function SchedulesPageView({ profileName }: { profileName?: string }) {
             <Button size='sm' onClick={openCreate} disabled={schedules.unavailable}>
               <Plus className='size-4' /> Nueva
             </Button>
+            <HeaderTools />
           </div>
         </div>
       </Header>

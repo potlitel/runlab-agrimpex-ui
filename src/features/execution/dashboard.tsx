@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { Header } from '@/components/layout/header'
+import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
 import { useProfileStore } from '@/stores/profileStore'
 import { ExecutionConsole } from './components/execution-console'
@@ -33,11 +34,12 @@ function ExecutionDashboardView({ profileName }: { profileName?: string }) {
               Consola de ejecución en vivo
             </p>
           </div>
-          <div className='flex items-center gap-2'>
+          <div className='ms-auto flex items-center gap-2'>
             <Badge variant='secondary'>
               {profileName ?? 'Sin perfil activo'}
             </Badge>
             {execution.running && <Badge>En ejecución</Badge>}
+            <HeaderTools />
           </div>
         </div>
       </Header>

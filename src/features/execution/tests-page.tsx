@@ -1,5 +1,11 @@
+import { useQuery } from '@tanstack/react-query'
+import { FolderKanban, RefreshCw } from 'lucide-react'
+import { configApi } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Header } from '@/components/layout/header'
+import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
 import { useProfileStore } from '@/stores/profileStore'
 import { TestExplorer } from './components/test-explorer'
@@ -17,13 +23,31 @@ export function TestsPage() {
   return (
     <TestsPageView
       key={activeProfileId ?? 'none'}
+      profileId={activeProfileId}
       profileName={activeProfile?.name}
     />
   )
 }
 
-function TestsPageView({ profileName }: { profileName?: string }) {
+function TestsPageView({
+  profileId,
+  profileName,
+}: {
+  profileId: string | null
+  profileName?: string
+}) {
   const execution = useExecution()
+  const configQuery = useQuery({
+    queryKey: ['config', profileId],
+    queryFn: () => configApi.get(),
+    enabled: !!profileId,
+    retry: false,
+  })
+
+  const config = configQuery.data
+  const projectPath = config?.projectPath?.trim() || ''
+  const playwrightCmd = config?.playwrightCmd?.trim() || config?.pytestCmd?.trim() || ''
+  const configured = !!projectPath
 
   return (
     <>
@@ -35,15 +59,61 @@ function TestsPageView({ profileName }: { profileName?: string }) {
               Explorador de specs y configuración de corrida
             </p>
           </div>
-          <div className='flex items-center gap-2'>
+          <div className='ms-auto flex flex-wrap items-center gap-2'>
             <Badge variant='secondary'>
               {profileName ?? 'Sin perfil activo'}
             </Badge>
             {execution.running && <Badge>En ejecución</Badge>}
+            <HeaderTools />
           </div>
         </div>
       </Header>
       <Main>
+        <Card className='mb-4 border-primary/20 bg-primary/5'>
+          <CardContent className='flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between'>
+            <div className='flex min-w-0 items-start gap-3'>
+              <div className='mt-0.5 rounded-md border bg-background p-2 text-primary'>
+                <FolderKanban className='size-4' />
+              </div>
+              <div className='min-w-0 space-y-1'>
+                <div className='flex flex-wrap items-center gap-2'>
+                  <p className='font-medium'>Proyecto de pruebas</p>
+                  <Badge variant={configured ? 'default' : 'destructive'}>
+                    {configured ? 'Configurado' : 'Sin configurar'}
+                  </Badge>
+                </div>
+                <p className='truncate font-mono text-xs text-muted-foreground' title={projectPath || undefined}>
+                  {configured ? projectPath : 'Configura la ruta del proyecto para habilitar la ejecución y la exploración de archivos.'}
+                </p>
+                <div className='flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground'>
+                  <span>
+                    Comando: <span className='font-mono'>{playwrightCmd || '—'}</span>
+                  </span>
+                  <span>
+                    Catálogo: <span className='tabular-nums'>{execution.tree?.total ?? 0}</span> tests
+                  </span>
+                  {execution.tree?.projects?.length ? (
+                    <span>
+                      Projects: <span className='font-mono'>{execution.tree.projects.join(', ')}</span>
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+            <div className='flex shrink-0 items-center gap-2'>
+              <Button
+                size='sm'
+                variant='outline'
+                onClick={() => void configQuery.refetch()}
+                disabled={configQuery.isFetching}
+              >
+                <RefreshCw className={configQuery.isFetching ? 'size-4 animate-spin' : 'size-4'} />
+                Refrescar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className='grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]'>
           <TestExplorer
             tree={execution.tree}
@@ -55,6 +125,7 @@ function TestsPageView({ profileName }: { profileName?: string }) {
             onToggleFile={execution.toggleFile}
             onClear={execution.clearSelection}
             onRefresh={execution.refresh}
+            projectConfigured={configured}
           />
           <RunControls
             tree={execution.tree}

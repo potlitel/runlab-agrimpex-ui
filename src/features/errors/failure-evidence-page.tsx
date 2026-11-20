@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Header } from '@/components/layout/header'
+import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
 import { useProfileStore } from '@/stores/profileStore'
 import { useFailureEvidence } from './use-failure-evidence'
@@ -56,12 +57,13 @@ function FailureEvidenceView({ profileName }: { profileName?: string }) {
               Capturas e imágenes generadas durante las ejecuciones
             </p>
           </div>
-          <div className='flex items-center gap-2'>
+          <div className='ms-auto flex items-center gap-2'>
             <Badge variant='secondary'>{profileName ?? 'Sin perfil activo'}</Badge>
             <Button size='sm' variant='outline' onClick={evidence.refresh} disabled={evidence.loading}>
               <RefreshCw className={evidence.loading ? 'size-4 animate-spin' : 'size-4'} />
               Actualizar
             </Button>
+            <HeaderTools />
           </div>
         </div>
       </Header>

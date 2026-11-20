@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Header } from '@/components/layout/header'
+import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
 import { useProfileStore } from '@/stores/profileStore'
 import { JsonDataPanel } from './components/json-data-panel'
@@ -41,7 +42,10 @@ function TestDataPageView({ profileName }: { profileName?: string }) {
               Fuentes TXT y JSON configuradas para el perfil activo
             </p>
           </div>
-          <Badge variant='secondary'>{profileName ?? 'Sin perfil activo'}</Badge>
+          <div className='ms-auto flex items-center gap-2'>
+            <Badge variant='secondary'>{profileName ?? 'Sin perfil activo'}</Badge>
+            <HeaderTools />
+          </div>
         </div>
       </Header>
       <Main>

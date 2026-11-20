@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Header } from '@/components/layout/header'
+import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
 import { useProfileStore } from '@/stores/profileStore'
 import { DockerActions } from './components/docker-actions'
@@ -39,7 +40,7 @@ function DockerPageView({ profileName }: { profileName?: string }) {
               Infraestructura, grid y acciones de ejecución
             </p>
           </div>
-          <div className='flex items-center gap-2'>
+          <div className='ms-auto flex items-center gap-2'>
             <Badge variant='secondary'>{profileName ?? 'Sin perfil activo'}</Badge>
             <Button size='sm' variant='outline' onClick={docker.refresh}>
               <RefreshCw className='size-4' /> Actualizar
@@ -51,6 +52,7 @@ function DockerPageView({ profileName }: { profileName?: string }) {
                 </a>
               </Button>
             ) : null}
+            <HeaderTools />
           </div>
         </div>
       </Header>

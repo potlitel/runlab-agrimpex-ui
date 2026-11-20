@@ -112,8 +112,11 @@ function ConfigForm({ initial, settings }: { initial: Config; settings: UseConfi
                 id='playwrightCmd'
                 value={form.playwrightCmd ?? ''}
                 onChange={(e) => set('playwrightCmd', e.target.value)}
-                placeholder='npx playwright test'
+                placeholder='npx playwright'
               />
+              <p className='text-xs text-muted-foreground'>
+                Comando base que la API usa para recolectar y ejecutar tests (se antepone a <span className='font-mono'>test</span>). Recomendado: <span className='font-mono'>npx playwright</span>.
+              </p>
             </div>
             <div className='space-y-1.5'>
               <Label htmlFor='pytestCmd'>Comando Pytest (compatibilidad)</Label>

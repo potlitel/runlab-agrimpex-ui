@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronRight, Eye, FileCode2, RefreshCw, Search } from 'lucide-react'
+import { ChevronRight, Eye, FileCode2, FolderOpen, RefreshCw, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,6 +19,7 @@ type TestExplorerProps = {
   onToggleFile: (ids: string[], checked: boolean) => void
   onClear: () => void
   onRefresh: () => void
+  projectConfigured?: boolean
 }
 
 export function TestExplorer({
@@ -31,6 +32,7 @@ export function TestExplorer({
   onToggleFile,
   onClear,
   onRefresh,
+  projectConfigured = true,
 }: TestExplorerProps) {
   const [query, setQuery] = useState('')
   const [fileToView, setFileToView] = useState<string | null>(null)
@@ -56,25 +58,39 @@ export function TestExplorer({
   return (
     <Card className='flex min-h-0 flex-col'>
       <CardHeader className='gap-3 border-b pb-4'>
-        <div className='flex items-start justify-between gap-3'>
-          <div>
-            <CardTitle className='flex items-center gap-2'>
+        <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+          <div className='min-w-0'>
+            <CardTitle className='flex flex-wrap items-center gap-2'>
               Catálogo de tests
               <Badge variant='secondary'>{tree?.total ?? 0}</Badge>
+              {tree?.projects?.length ? (
+                <Badge variant='outline'>{tree.projects.length} projects</Badge>
+              ) : null}
             </CardTitle>
             <p className='mt-1 text-sm text-muted-foreground'>
-              Selecciona los tests que quieres ejecutar
+              Selecciona specs para ejecutar o abre cualquier archivo del proyecto en el visor.
             </p>
           </div>
-          <Button
-            size='sm'
-            variant='outline'
-            onClick={onRefresh}
-            disabled={loading || running}
-          >
-            <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
-            {loading ? 'Actualizando' : 'Actualizar'}
-          </Button>
+          <div className='flex flex-wrap items-center gap-2'>
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={() => setFileToView('')}
+              title='Abrir un archivo del proyecto por ruta relativa'
+            >
+              <FolderOpen className='size-4' />
+              Abrir archivo
+            </Button>
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={onRefresh}
+              disabled={loading || running}
+            >
+              <RefreshCw className={loading ? 'size-4 animate-spin' : 'size-4'} />
+              {loading ? 'Actualizando' : 'Actualizar'}
+            </Button>
+          </div>
         </div>
         <div className='relative'>
           <Search className='absolute start-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground' />
@@ -85,60 +101,84 @@ export function TestExplorer({
             className='h-8 ps-8'
           />
         </div>
-        {selected.length > 0 && (
-          <div className='flex items-center justify-between text-xs text-muted-foreground'>
-            <span>{selected.length} seleccionados</span>
+        <div className='flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground'>
+          <span>
+            {selected.length > 0 ? `${selected.length} seleccionados` : 'Sin selección'}
+            {visibleCount > 0 ? ` · ${visibleCount} visibles` : ''}
+          </span>
+          {selected.length > 0 && (
             <Button
               size='sm'
               variant='ghost'
               className='h-7 px-2 text-xs'
               onClick={onClear}
             >
-              Limpiar
+              Limpiar selección
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </CardHeader>
       <CardContent className='min-h-0 flex-1 p-0'>
         {error ? (
-          <div className='p-6 text-sm text-destructive'>{error}</div>
+          <div className='space-y-2 p-6 text-sm'>
+            <p className='font-medium text-destructive'>No se pudo cargar el catálogo</p>
+            <p className='text-muted-foreground'>{error}</p>
+            {!projectConfigured && (
+              <p className='text-muted-foreground'>
+                Configura la ruta del proyecto y el comando Playwright en Ajustes para descubrir y ejecutar tests.
+              </p>
+            )}
+          </div>
         ) : files.length === 0 ? (
-          <div className='p-6 text-sm text-muted-foreground'>
-            {loading
-              ? 'Cargando catálogo…'
-              : 'No hay tests para mostrar. Actualiza el catálogo o configura el proyecto en Ajustes.'}
+          <div className='space-y-3 p-6 text-sm text-muted-foreground'>
+            <p>
+              {loading
+                ? 'Cargando catálogo de tests…'
+                : 'No hay tests para mostrar con el estado actual.'}
+            </p>
+            {!loading && (
+              <ul className='list-disc space-y-1 ps-5'>
+                <li>Actualiza el catálogo para recolectar specs desde el proyecto configurado.</li>
+                <li>Usa «Abrir archivo» para inspeccionar archivos del proyecto aunque el catálogo esté vacío.</li>
+                <li>Verifica la configuración del proyecto y del comando Playwright en Ajustes.</li>
+              </ul>
+            )}
           </div>
         ) : (
           <ScrollArea className='h-[420px]'>
             <div className='space-y-3 p-4'>
               {files.map(([file, ids]) => {
                 const allSelected = ids.every((id) => selected.includes(id))
+                const someSelected = !allSelected && ids.some((id) => selected.includes(id))
                 return (
                   <div key={file} className='rounded-lg border'>
                     <div className='flex items-center gap-2 border-b bg-muted/40 px-3 py-2'>
                       <Checkbox
-                        checked={allSelected}
+                        checked={allSelected ? true : someSelected ? 'indeterminate' : false}
                         onCheckedChange={(checked) =>
                           onToggleFile(ids, checked === true)
                         }
                         aria-label={`Seleccionar archivo ${file}`}
                       />
                       <FileCode2 className='size-4 text-muted-foreground' />
-                      <span className='min-w-0 flex-1 truncate font-mono text-xs'>
-                        {file.split('/').pop()}
-                      </span>
+                      <div className='min-w-0 flex-1'>
+                        <span className='block truncate font-mono text-xs' title={file}>
+                          {file}
+                        </span>
+                      </div>
                       <span className='text-xs text-muted-foreground'>
                         {ids.length}
                       </span>
                       <Button
                         type='button'
-                        size='icon'
+                        size='sm'
                         variant='ghost'
-                        className='size-7'
+                        className='h-7 gap-1 px-2 text-xs'
                         onClick={() => setFileToView(file)}
                         aria-label={`Ver contenido de ${file}`}
                       >
                         <Eye className='size-3.5' />
+                        Ver
                       </Button>
                     </div>
                     <div className='divide-y'>
@@ -153,8 +193,8 @@ export function TestExplorer({
                             aria-label={`Seleccionar ${id}`}
                           />
                           <ChevronRight className='size-3 text-muted-foreground' />
-                          <span className='min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground'>
-                            {id.split('::').slice(1).join(' :: ') || id}
+                          <span className='min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground' title={id}>
+                            {id.split('::').slice(1).join(' › ') || id}
                           </span>
                         </label>
                       ))}
@@ -167,7 +207,7 @@ export function TestExplorer({
         )}
         {!error && visibleCount > 0 && (
           <p className='border-t px-4 py-2 text-xs text-muted-foreground'>
-            {visibleCount} tests visibles
+            {visibleCount} tests visibles · {Object.keys(tree?.files ?? {}).length} archivos
           </p>
         )}
       </CardContent>
