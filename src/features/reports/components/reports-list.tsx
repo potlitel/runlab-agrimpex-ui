@@ -1,4 +1,6 @@
-import { Eye, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Eye, ImageIcon } from 'lucide-react'
+import { reportsApi } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,9 +18,7 @@ type ReportsListProps = {
   reports: ReportListItem[]
   loading: boolean
   error: string | null
-  deletingId: string | null
   onSelect: (id: string) => void
-  onDelete: (id: string) => void
 }
 
 function formatDate(ts?: string) {
@@ -27,13 +27,49 @@ function formatDate(ts?: string) {
   return Number.isNaN(d.getTime()) ? ts : d.toLocaleString()
 }
 
+function PreviewThumb({
+  reportId,
+  preview,
+  onSelect,
+}: {
+  reportId: string
+  preview?: string | null
+  onSelect: (id: string) => void
+}) {
+  const [broken, setBroken] = useState(false)
+  if (!preview || broken) {
+    return (
+      <div
+        className='flex h-12 w-20 items-center justify-center rounded-md border border-dashed bg-muted/20 text-muted-foreground'
+        title={preview ? 'No se pudo cargar la imagen' : 'Sin imagen disponible'}
+      >
+        <ImageIcon className='size-4' />
+      </div>
+    )
+  }
+  return (
+    <button
+      type='button'
+      onClick={() => onSelect(reportId)}
+      className='group block overflow-hidden rounded-md border bg-muted/30 focus:outline-none focus:ring-2 focus:ring-ring'
+      title='Ver reporte'
+    >
+      <img
+        src={reportsApi.assetUrl(reportId, preview)}
+        alt={`Vista previa de ${reportId}`}
+        className='h-12 w-20 object-cover transition-transform group-hover:scale-105'
+        loading='lazy'
+        onError={() => setBroken(true)}
+      />
+    </button>
+  )
+}
+
 export function ReportsList({
   reports,
   loading,
   error,
-  deletingId,
   onSelect,
-  onDelete,
 }: ReportsListProps) {
   return (
     <Card>
@@ -63,6 +99,7 @@ export function ReportsList({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className='w-[96px]'>Evidencia</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Reporte</TableHead>
                 <TableHead className='text-end'>Total</TableHead>
@@ -75,8 +112,16 @@ export function ReportsList({
             <TableBody>
               {reports.map((report) => {
                 const failed = (report.summary.failed ?? 0) + (report.summary.errors ?? 0)
+                const preview = report.summary.previewImage
                 return (
                   <TableRow key={report.id}>
+                    <TableCell>
+                      <PreviewThumb
+                        reportId={report.id}
+                        preview={preview}
+                        onSelect={onSelect}
+                      />
+                    </TableCell>
                     <TableCell className='whitespace-nowrap text-sm'>
                       {formatDate(report.timestamp)}
                     </TableCell>
@@ -92,23 +137,9 @@ export function ReportsList({
                       {report.summary.duration != null ? `${report.summary.duration.toFixed(1)}s` : '—'}
                     </TableCell>
                     <TableCell>
-                      <div className='flex justify-end gap-1'>
+                      <div className='flex justify-end'>
                         <Button size='sm' variant='ghost' onClick={() => onSelect(report.id)}>
                           <Eye className='size-4' /> Ver
-                        </Button>
-                        <Button
-                          size='sm'
-                          variant='ghost'
-                          className='text-destructive hover:text-destructive'
-                          disabled={deletingId === report.id}
-                          onClick={() => {
-                            const ok = window.confirm(
-                              `¿Eliminar el reporte ${report.id}? Esta acción no se puede deshacer.`
-                            )
-                            if (ok) onDelete(report.id)
-                          }}
-                        >
-                          <Trash2 className='size-4' />
                         </Button>
                       </div>
                     </TableCell>

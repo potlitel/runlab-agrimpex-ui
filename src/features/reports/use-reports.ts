@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { featuresApi, reportsApi } from '@/lib/api'
 import { ApiError } from '@/types/contract'
 import { useProfileStore } from '@/stores/profileStore'
@@ -49,18 +48,6 @@ export function useReports() {
     retry: false,
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => reportsApi.delete(id),
-    onSuccess: (_data, id) => {
-      toast.success('Reporte eliminado')
-      queryClient.invalidateQueries({ queryKey: ['reports'] })
-      setSelectedId((current) => (current === id ? null : current))
-    },
-    onError: (error) => {
-      toast.error(messageOf(error, 'No se pudo eliminar el reporte'))
-    },
-  })
-
   const listUnavailable = reportsEnabled && isUnavailable(listQuery.error)
   const analyticsUnavailable = reportsEnabled && isUnavailable(analyticsQuery.error)
   const unavailable =
@@ -95,9 +82,6 @@ export function useReports() {
     detailError: detailQuery.error
       ? messageOf(detailQuery.error, 'No se pudo cargar el detalle del reporte')
       : null,
-
-    deleteReport: (id: string) => deleteMutation.mutate(id),
-    deletingId: deleteMutation.isPending ? deleteMutation.variables : null,
 
     refresh: () => {
       void queryClient.invalidateQueries({ queryKey: ['reports'] })

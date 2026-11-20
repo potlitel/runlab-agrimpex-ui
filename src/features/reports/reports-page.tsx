@@ -87,9 +87,7 @@ function ReportsPageView({ profileName }: { profileName?: string }) {
               reports={reports.reports}
               loading={reports.listLoading}
               error={reports.listError}
-              deletingId={reports.deletingId}
               onSelect={reports.selectReport}
-              onDelete={reports.deleteReport}
             />
           </div>
         )}
@@ -101,11 +99,9 @@ function ReportsPageView({ profileName }: { profileName?: string }) {
         detail={reports.detail}
         loading={reports.detailLoading}
         error={reports.detailError}
-        deleting={reports.deletingId === reports.selectedId && reports.selectedId != null}
         onOpenChange={(open) => {
           if (!open) reports.selectReport(null)
         }}
-        onDelete={reports.deleteReport}
       />
     </>
   )

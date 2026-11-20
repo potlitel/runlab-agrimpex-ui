@@ -60,13 +60,13 @@ npm run preview
 
 - **Dashboard (`/`)**: consola y resultados de la ejecución en vivo del perfil activo.
 - **Tests (`/tests`)**: proyecto de pruebas visible/configurado, catálogo de specs, configuración de corrida, consola/resultados y visor de archivos del proyecto.
-- **Reportes (`/reports`)**: historial, analítica y detalle de ejecuciones.
+- **Reportes (`/reports`)**: historial, analítica y detalle de ejecuciones. El historial incluye una **miniatura de evidencia** por reporte (cuando el run genera imagen/`summary.previewImage`) y el detalle permite visualizar adjuntos/evidencias de imagen por test.
 - **Evidencia de fallos (`/errors`)**: galería de capturas/evidencias generadas durante corridas.
 - **Entornos (`/env`)**: edición de archivos `.env` del proyecto y entornos/variables guardados por perfil.
 - **Docker (`/docker`)**: estado del entorno Docker/grid y acciones asociadas.
 - **Calendarización (`/schedules`)**: programación de ejecuciones automáticas.
 - **Datos de prueba (`/data`)**: fuentes de datos TXT/JSON (según módulos habilitados).
-- **Ajustes (`/settings`)**: configuración de proyecto/rutas, módulos (feature flags), automatización, perfiles y sistema.
+- **Ajustes (`/settings`)**: configuración de proyecto/rutas, módulos (feature flags), automatización, perfiles y sistema. Incluye la tarjeta **Evidencias de ejecución (Playwright)** para controlar capturas (screenshot/video/trace y página completa) por perfil.
 
 ## Header y herramientas globales
 
@@ -108,6 +108,7 @@ Campos principales:
   - Si usas `npx playwright test` como base, el comando resultante será incorrecto (duplicará `test`).
 - **Comando Pytest (`pytestCmd`)**: campo **deprecado** mantenido por compatibilidad; para proyectos Playwright usa `playwrightCmd`.
 - Rutas opcionales de datos/evidencias y URL remota de Selenium/Grid según los módulos habilitados.
+- **Evidencias de ejecución (Playwright) (`evidence`)**: permite definir overrides por perfil para `screenshot` (`always`/`only-on-failure`/`off`), `video`, `trace` y `fullPage`. La opción *“Según proyecto (sin override)”* respeta el `playwright.config` del proyecto. Con `screenshot = always` se generan capturas también para tests pasados y el historial puede mostrar una foto por reporte.
 
 ## Estructura relevante del frontend
 

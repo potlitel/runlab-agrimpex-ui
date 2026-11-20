@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { FolderOpen, FileSearch, RefreshCw, Save, ShieldCheck } from 'lucide-react'
+import { Camera, FolderOpen, FileSearch, RefreshCw, Save, ShieldCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import type { Config } from '@/types/contract'
+import { Switch } from '@/components/ui/switch'
+import type { Config, EvidenceConfig, ScreenshotMode, TraceMode, VideoMode } from '@/types/contract'
 import type { UseConfigSettingsReturn } from '../use-config-settings'
 
 type Props = {
@@ -28,6 +30,19 @@ function ConfigForm({ initial, settings }: { initial: Config; settings: UseConfi
 
   function set<K extends keyof Config>(key: K, value: Config[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function setEvidence<K extends keyof EvidenceConfig>(key: K, value: EvidenceConfig[K] | undefined) {
+    setForm((prev) => {
+      const next = { ...(prev.evidence ?? {}) } as EvidenceConfig
+      if (value === undefined) {
+        delete (next as Record<string, unknown>)[key as string]
+      } else {
+        next[key] = value
+      }
+      const cleaned = Object.fromEntries(Object.entries(next).filter(([, v]) => v !== undefined))
+      return { ...prev, evidence: Object.keys(cleaned).length ? (cleaned as EvidenceConfig) : undefined }
+    })
   }
 
   async function pick(field: keyof Config, type: 'folder' | 'file') {
@@ -164,6 +179,94 @@ function ConfigForm({ initial, settings }: { initial: Config; settings: UseConfi
                 value={form.seleniumRemoteUrl ?? ''}
                 onChange={(e) => set('seleniumRemoteUrl', e.target.value)}
                 placeholder='http://localhost:4444/wd/hub'
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className='flex items-center gap-2'>
+            <Camera className='size-5 text-muted-foreground' />
+            <div>
+              <CardTitle>Evidencias de ejecución (Playwright)</CardTitle>
+              <CardDescription>
+                Controla la captura de screenshots, video y trazas para los reportes. Si se deja en “Según proyecto”, se respeta el <span className='font-mono'>playwright.config</span> del proyecto.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid gap-4 md:grid-cols-2'>
+            <div className='space-y-1.5'>
+              <Label>Captura de screenshot</Label>
+              <Select
+                value={form.evidence?.screenshot ?? 'project'}
+                onValueChange={(v) => setEvidence('screenshot', v === 'project' ? undefined : (v as ScreenshotMode))}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue placeholder='Según proyecto' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='project'>Según proyecto (sin override)</SelectItem>
+                  <SelectItem value='always'>Siempre (passed y failed)</SelectItem>
+                  <SelectItem value='only-on-failure'>Solo en fallos</SelectItem>
+                  <SelectItem value='off'>Desactivado</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className='text-xs text-muted-foreground'>
+                “Siempre” genera una foto por test sin importar el resultado, útil para mostrar una imagen por reporte en el historial.
+              </p>
+            </div>
+            <div className='space-y-1.5'>
+              <Label>Video</Label>
+              <Select
+                value={form.evidence?.video ?? 'project'}
+                onValueChange={(v) => setEvidence('video', v === 'project' ? undefined : (v as VideoMode))}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue placeholder='Según proyecto' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='project'>Según proyecto (sin override)</SelectItem>
+                  <SelectItem value='on'>Siempre</SelectItem>
+                  <SelectItem value='retain-on-failure'>Conservar solo en fallos</SelectItem>
+                  <SelectItem value='on-first-retry'>Solo en primer reintento</SelectItem>
+                  <SelectItem value='off'>Desactivado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className='grid gap-4 md:grid-cols-2'>
+            <div className='space-y-1.5'>
+              <Label>Trace</Label>
+              <Select
+                value={form.evidence?.trace ?? 'project'}
+                onValueChange={(v) => setEvidence('trace', v === 'project' ? undefined : (v as TraceMode))}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue placeholder='Según proyecto' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='project'>Según proyecto (sin override)</SelectItem>
+                  <SelectItem value='on'>Siempre</SelectItem>
+                  <SelectItem value='retain-on-failure'>Conservar solo en fallos</SelectItem>
+                  <SelectItem value='on-first-retry'>Solo en primer reintento</SelectItem>
+                  <SelectItem value='off'>Desactivado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className='flex items-center justify-between gap-3 rounded-md border p-3 md:mt-6'>
+              <div>
+                <Label htmlFor='evidence-fullpage' className='cursor-pointer font-medium'>Screenshot de página completa</Label>
+                <p className='text-xs text-muted-foreground'>Aplica cuando la captura de screenshots está activa (fullPage).</p>
+              </div>
+              <Switch
+                id='evidence-fullpage'
+                checked={!!form.evidence?.fullPage}
+                onCheckedChange={(v) => setEvidence('fullPage', v ? true : undefined)}
               />
             </div>
           </div>

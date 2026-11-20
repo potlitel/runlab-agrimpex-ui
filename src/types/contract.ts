@@ -50,6 +50,17 @@ export interface ProjectFeatures {
   [key: string]: unknown
 }
 
+export type ScreenshotMode = 'always' | 'only-on-failure' | 'off'
+export type VideoMode = 'on' | 'off' | 'retain-on-failure' | 'on-first-retry'
+export type TraceMode = 'on' | 'off' | 'retain-on-failure' | 'on-first-retry'
+
+export interface EvidenceConfig {
+  screenshot?: ScreenshotMode
+  video?: VideoMode
+  trace?: TraceMode
+  fullPage?: boolean
+}
+
 export interface Config {
   projectPath?: string
   envPath?: string
@@ -60,6 +71,7 @@ export interface Config {
   errorImagesPath?: string
   jsonDataPath?: string
   projectFeatures?: ProjectFeatures
+  evidence?: EvidenceConfig
   [key: string]: unknown
 }
 
@@ -143,6 +155,7 @@ export interface ReportSummary {
   errors?: number
   skipped?: number
   duration?: number
+  previewImage?: string | null
   [key: string]: unknown
 }
 
@@ -153,13 +166,21 @@ export interface ReportListItem {
   [key: string]: unknown
 }
 
+export interface ReportAttachment {
+  name?: string
+  contentType?: string
+  path?: string
+  assetPath?: string
+  [key: string]: unknown
+}
+
 export interface ReportTestResult {
   id: string
   status: 'passed' | 'failed' | 'error' | 'skipped' | string
   duration?: number
   output?: string
   errorMsg?: string
-  attachments?: Array<Record<string, unknown>>
+  attachments?: ReportAttachment[]
   project?: string
   [key: string]: unknown
 }
