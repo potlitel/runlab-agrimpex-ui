@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { FolderKanban, RefreshCw } from 'lucide-react'
+import { FolderKanban, FolderOpen, RefreshCw } from 'lucide-react'
 import { configApi } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,7 @@ import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
 import { useProfileStore } from '@/stores/profileStore'
 import { TestExplorer } from './components/test-explorer'
+import { TestFileDialog } from './components/test-file-dialog'
 import { RunControls } from './components/run-controls'
 import { ExecutionConsole } from './components/execution-console'
 import { ResultsTable } from './components/results-table'
@@ -37,6 +39,7 @@ function TestsPageView({
   profileName?: string
 }) {
   const execution = useExecution()
+  const [fileToView, setFileToView] = useState<string | null>(null)
   const configQuery = useQuery({
     queryKey: ['config', profileId],
     queryFn: () => configApi.get(),
@@ -104,11 +107,22 @@ function TestsPageView({
               <Button
                 size='sm'
                 variant='outline'
+                onClick={() => setFileToView('')}
+                disabled={!configured}
+                title={configured ? 'Abrir y visualizar cualquier archivo del proyecto (ruta relativa al projectPath)' : 'Configura el proyecto para visualizar archivos'}
+              >
+                <FolderOpen className='size-4' />
+                Ver archivo
+              </Button>
+              <Button
+                size='sm'
+                variant='outline'
                 onClick={() => void configQuery.refetch()}
                 disabled={configQuery.isFetching}
+                title='Refrescar configuración del proyecto'
               >
                 <RefreshCw className={configQuery.isFetching ? 'size-4 animate-spin' : 'size-4'} />
-                Refrescar
+                Refrescar config
               </Button>
             </div>
           </CardContent>
@@ -148,6 +162,12 @@ function TestsPageView({
           <ResultsTable results={execution.results} />
         </div>
       </Main>
+      <TestFileDialog
+        file={fileToView}
+        onOpenChange={(open) => {
+          if (!open) setFileToView(null)
+        }}
+      />
     </>
   )
 }

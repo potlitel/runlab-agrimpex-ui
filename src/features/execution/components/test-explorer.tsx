@@ -76,10 +76,10 @@ export function TestExplorer({
               size='sm'
               variant='outline'
               onClick={() => setFileToView('')}
-              title='Abrir un archivo del proyecto por ruta relativa'
+              title='Visualizar cualquier archivo del proyecto indicando su ruta relativa al projectPath'
             >
               <FolderOpen className='size-4' />
-              Abrir archivo
+              Ver archivo
             </Button>
             <Button
               size='sm'
