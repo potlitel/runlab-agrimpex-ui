@@ -51,12 +51,26 @@ export function useAutomationSettings() {
     refetchInterval: 5000,
   })
 
+  const [checkRequestedAt, setCheckRequestedAt] = useState<number | null>(null)
+  const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null)
+
   const checkQuery = useQuery({
     queryKey: ['automation', activeProfileId, 'check'],
-    queryFn: () => automationApi.check(),
-    enabled: !!activeProfileId,
+    queryFn: async () => {
+      const result = await automationApi.check()
+      setLastCheckedAt(Date.now())
+      return result
+    },
+    enabled: false,
     retry: false,
   })
+  const { refetch: refetchCheck } = checkQuery
+
+  const runCheck = useCallback(() => {
+    if (!activeProfileId) return
+    setCheckRequestedAt(Date.now())
+    void refetchCheck()
+  }, [activeProfileId, refetchCheck])
 
   const installPath = configQuery.data?.installPath ?? ''
 
@@ -233,9 +247,11 @@ export function useAutomationSettings() {
     refreshStatus: () => void statusQuery.refetch(),
 
     check: checkQuery.data ?? null,
-    checkLoading: checkQuery.isPending,
+    checkLoading: checkQuery.isFetching,
     checkError: checkQuery.error ? msg(checkQuery.error, 'No se pudo ejecutar el chequeo') : null,
-    runCheck: () => void checkQuery.refetch(),
+    checkRequestedAt,
+    lastCheckedAt,
+    runCheck,
 
     installStatus: installStatusQuery.data ?? null,
     installStatusLoading: installStatusQuery.isPending,

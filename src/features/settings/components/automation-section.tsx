@@ -1,5 +1,22 @@
-import { useMemo, useState } from 'react'
-import { Download, Eraser, GitBranch, Hammer, PackagePlus, Play, RefreshCw, Save, Terminal, Wrench } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  CheckCircle2,
+  Circle,
+  Clock3,
+  Download,
+  Eraser,
+  GitBranch,
+  Hammer,
+  Loader2,
+  PackagePlus,
+  Play,
+  RefreshCw,
+  Save,
+  Terminal,
+  Wrench,
+  XCircle,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -88,40 +105,21 @@ function AutomationInner({
               <Badge variant={status?.installing ? 'default' : 'outline'}>Instalando: {status?.installing ? 'sí' : 'no'}</Badge>
               <Badge variant={status?.pulling ? 'default' : 'outline'}>Actualizando: {status?.pulling ? 'sí' : 'no'}</Badge>
               <Badge variant={status?.envBusy ? 'default' : 'outline'}>Entorno: {status?.envBusy ? 'ocupado' : 'libre'}</Badge>
-              <Button size='sm' variant='outline' onClick={settings.refreshStatus}>
+              <Button size='sm' variant='outline' onClick={settings.refreshStatus} title='Refrescar estado de operaciones'>
                 <RefreshCw className='size-4' />
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className='space-y-3'>
-          <div className='flex items-center justify-between gap-2'>
-            <div className='text-sm font-medium'>Chequeo de herramientas</div>
-            <Button size='sm' variant='outline' onClick={settings.runCheck} disabled={settings.checkLoading}>
-              <Terminal className='size-4' /> {settings.checkLoading ? 'Comprobando…' : 'Comprobar'}
-            </Button>
-          </div>
-          {settings.checkError ? (
-            <p className='text-sm text-destructive'>{settings.checkError}</p>
-          ) : check ? (
-            <div className='grid gap-2 sm:grid-cols-3'>
-              {Object.entries(check).map(([key, val]) => {
-                const ok = typeof val === 'object' && val && 'ok' in val ? !!(val as { ok: boolean }).ok : false
-                const err = typeof val === 'object' && val && 'error' in val ? (val as { error?: string }).error : undefined
-                return (
-                  <div key={key} className='rounded-md border p-3'>
-                    <div className='flex items-center justify-between gap-2'>
-                      <span className='font-medium capitalize'>{key}</span>
-                      <Badge variant={ok ? 'default' : 'secondary'}>{ok ? 'OK' : 'No disponible'}</Badge>
-                    </div>
-                    {err && <p className='mt-1 text-xs text-muted-foreground'>{err}</p>}
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className='text-sm text-muted-foreground'>Ejecuta el chequeo para ver el estado de git, python y venv.</p>
-          )}
+        <CardContent className='space-y-4'>
+          <AutomationChecks
+            check={check}
+            loading={settings.checkLoading}
+            error={settings.checkError}
+            requestedAt={settings.checkRequestedAt}
+            lastCheckedAt={settings.lastCheckedAt}
+            onRun={settings.runCheck}
+          />
         </CardContent>
       </Card>
 
@@ -356,6 +354,269 @@ function AutomationInner({
           </ScrollArea>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+type CheckValue = {
+  ok?: boolean
+  error?: string
+  version?: string
+  cmd?: string
+  installed?: boolean
+  daemonRunning?: boolean
+}
+
+type CheckResult = Record<string, unknown> | null
+
+const CHECK_TOOLS: Array<{ key: string; label: string; description: string }> = [
+  { key: 'python', label: 'Python', description: 'Intérprete para flujos legacy y utilidades del entorno' },
+  { key: 'git', label: 'Git', description: 'Control de versiones para clonado y actualización de repos' },
+  { key: 'venv', label: 'Virtualenv', description: 'Creación de entornos virtuales Python (cuando aplica)' },
+  { key: 'docker', label: 'Docker', description: 'Motor/contenedores para grid y flujos opcionales' },
+  { key: 'platform', label: 'Plataforma', description: 'Sistema operativo detectado por la API' },
+]
+
+function formatCheckValue(
+  key: string,
+  value: unknown
+): { ok: boolean | null; detail: string; status: string } {
+  if (key === 'platform') {
+    const text = typeof value === 'string' ? value : value == null ? '' : String(value)
+    return {
+      ok: text ? true : null,
+      detail: text || 'No detectada',
+      status: text ? 'Detectada' : 'Sin datos',
+    }
+  }
+
+  const v = (value ?? {}) as CheckValue
+  const ok = typeof v.ok === 'boolean' ? v.ok : null
+
+  if (key === 'docker') {
+    if (ok) {
+      const parts = ['Instalado']
+      if (v.version) parts.push(`v${v.version}`)
+      if (v.daemonRunning === false) parts.push('(daemon no disponible)')
+      return { ok, detail: parts.join(' '), status: 'Disponible' }
+    }
+    return { ok: false, detail: v.error || 'Docker no disponible', status: 'No disponible' }
+  }
+
+  if (ok) {
+    const parts: string[] = []
+    if (v.version) parts.push(`v${v.version}`)
+    if (v.cmd) parts.push(`(${v.cmd})`)
+    if (v.installed === false) parts.push('no instalado')
+    return { ok, detail: parts.join(' ') || 'Herramienta disponible', status: 'OK' }
+  }
+
+  return { ok: false, detail: v.error || 'No disponible', status: 'No disponible' }
+}
+
+function AutomationChecks({
+  check,
+  loading,
+  error,
+  requestedAt,
+  lastCheckedAt,
+  onRun,
+}: {
+  check: CheckResult
+  loading: boolean
+  error: string | null
+  requestedAt: number | null
+  lastCheckedAt: number | null
+  onRun: () => void
+}) {
+  const [animProgress, setAnimProgress] = useState(0)
+  const [animStep, setAnimStep] = useState(0)
+
+  useEffect(() => {
+    if (!loading) return
+
+    const started = requestedAt ?? Date.now()
+    const tick = window.setInterval(() => {
+      const elapsed = Date.now() - started
+      const pct = Math.min(92, 8 + Math.round((elapsed / 2400) * 84))
+      setAnimProgress(pct)
+      setAnimStep(Math.min(CHECK_TOOLS.length - 1, Math.floor((pct / 100) * CHECK_TOOLS.length)))
+    }, 180)
+
+    // Inicio diferido para evitar setState síncrono dentro del efecto.
+    const init = window.setTimeout(() => {
+      setAnimProgress(8)
+      setAnimStep(0)
+    }, 0)
+
+    return () => {
+      window.clearInterval(tick)
+      window.clearTimeout(init)
+    }
+  }, [loading, requestedAt])
+
+  const progress = loading ? animProgress : check || error ? 100 : 0
+  const activeStep = loading ? animStep : CHECK_TOOLS.length
+
+  const hasResult = !!check
+  const checkedLabel = lastCheckedAt ? new Date(lastCheckedAt).toLocaleString() : null
+  const overallState = loading ? 'running' : error ? 'error' : hasResult ? 'done' : 'idle'
+
+  return (
+    <div className='space-y-3'>
+      <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='space-y-1'>
+          <div className='text-sm font-medium'>Chequeo de herramientas</div>
+          <p className='text-xs text-muted-foreground'>
+            Verifica dependencias del sistema y del entorno de automatización con estado por herramienta.
+          </p>
+        </div>
+        <div className='flex flex-wrap items-center gap-2'>
+          {checkedLabel && !loading ? (
+            <span className='inline-flex items-center gap-1 text-xs text-muted-foreground'>
+              <Clock3 className='size-3.5' />
+              Último chequeo: {checkedLabel}
+            </span>
+          ) : null}
+          <Button size='sm' variant={hasResult ? 'outline' : 'default'} onClick={onRun} disabled={loading}>
+            {loading ? <Loader2 className='size-4 animate-spin' /> : <Terminal className='size-4' />}
+            {loading ? 'Comprobando…' : hasResult ? 'Volver a comprobar' : 'Comprobar'}
+          </Button>
+        </div>
+      </div>
+
+      {overallState !== 'idle' ? (
+        <div className='space-y-2 rounded-md border bg-muted/20 p-3'>
+          <div className='flex items-center justify-between gap-2 text-xs text-muted-foreground'>
+            <span>
+              {overallState === 'running'
+                ? 'Ejecutando comprobaciones de estado por herramienta…'
+                : overallState === 'error'
+                  ? 'El chequeo finalizó con error'
+                  : 'Comprobaciones completadas'}
+            </span>
+            <span className='tabular-nums'>{progress}%</span>
+          </div>
+          <div className='h-2 w-full overflow-hidden rounded-full bg-muted'>
+            <div
+              className={cn(
+                'h-full transition-all duration-300',
+                overallState === 'error'
+                  ? 'bg-destructive'
+                  : overallState === 'running'
+                    ? 'animate-pulse bg-primary/80'
+                    : 'bg-green-600'
+              )}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          {overallState === 'running' ? (
+            <p className='text-xs text-muted-foreground'>
+              Consultando estado de: {CHECK_TOOLS[Math.min(activeStep, CHECK_TOOLS.length - 1)]?.label ?? 'herramientas'}…
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {error ? <p className='text-sm text-destructive'>{error}</p> : null}
+
+      {!hasResult && !loading && !error ? (
+        <div className='rounded-md border border-dashed p-4 text-sm text-muted-foreground'>
+          <p className='font-medium text-foreground'>Aún no se ejecutó el chequeo</p>
+          <p className='mt-1'>
+            Pulsa <span className='font-medium'>Comprobar</span> para validar Python, Git, Virtualenv, Docker y la
+            plataforma. Verás progreso y el estado de cada verificación.
+          </p>
+        </div>
+      ) : (
+        <div className='grid gap-2 md:grid-cols-2'>
+          {CHECK_TOOLS.map((tool, idx) => {
+            const rawValue = check ? (check as Record<string, unknown>)[tool.key] : undefined
+            const isChecking = loading && idx <= activeStep
+            const formatted =
+              !loading && (hasResult || rawValue !== undefined)
+                ? formatCheckValue(tool.key, rawValue)
+                : null
+
+            const state: 'idle' | 'pending' | 'checking' | 'ok' | 'fail' = loading
+              ? isChecking
+                ? 'checking'
+                : 'pending'
+              : formatted
+                ? formatted.ok === false
+                  ? 'fail'
+                  : 'ok'
+                : error
+                  ? 'fail'
+                  : 'idle'
+
+            return (
+              <div
+                key={tool.key}
+                className={cn(
+                  'rounded-md border p-3 transition-colors',
+                  state === 'checking' && 'border-primary/40 bg-primary/5',
+                  state === 'pending' && 'border-dashed opacity-80',
+                  state === 'ok' && 'border-green-600/30 bg-green-600/5',
+                  state === 'fail' && 'border-destructive/30 bg-destructive/5'
+                )}
+              >
+                <div className='flex items-start justify-between gap-3'>
+                  <div className='min-w-0'>
+                    <div className='flex items-center gap-2'>
+                      {state === 'checking' ? (
+                        <Loader2 className='size-4 animate-spin text-primary' />
+                      ) : state === 'ok' ? (
+                        <CheckCircle2 className='size-4 text-green-600' />
+                      ) : state === 'fail' ? (
+                        <XCircle className='size-4 text-destructive' />
+                      ) : state === 'pending' ? (
+                        <Loader2 className='size-4 animate-spin text-muted-foreground/60' />
+                      ) : (
+                        <Circle className='size-4 text-muted-foreground' />
+                      )}
+                      <span className='font-medium'>{tool.label}</span>
+                    </div>
+                    <p className='mt-1 text-xs text-muted-foreground'>{tool.description}</p>
+                  </div>
+                  <Badge
+                    variant={state === 'ok' ? 'default' : state === 'fail' ? 'secondary' : 'outline'}
+                    className={cn(
+                      state === 'ok' && 'bg-green-600 text-white hover:bg-green-600',
+                      state === 'checking' && 'border-primary/40 text-primary',
+                      state === 'pending' && 'text-muted-foreground'
+                    )}
+                  >
+                    {state === 'checking'
+                      ? 'Verificando…'
+                      : state === 'pending'
+                        ? 'Pendiente'
+                        : formatted?.status ?? (error ? 'Sin datos' : '—')}
+                  </Badge>
+                </div>
+                <div className='mt-2 min-h-5 text-sm'>
+                  {state === 'checking' ? (
+                    <span className='text-muted-foreground'>
+                      Comprobando estado de {tool.label.toLowerCase()}…
+                    </span>
+                  ) : null}
+                  {state === 'pending' ? (
+                    <span className='text-muted-foreground'>En cola para verificación.</span>
+                  ) : null}
+                  {!loading && formatted ? (
+                    <span className={cn(formatted.ok === false ? 'text-destructive' : 'text-foreground')}>
+                      {formatted.detail}
+                    </span>
+                  ) : null}
+                  {!loading && !formatted && error ? (
+                    <span className='text-muted-foreground'>No se pudo obtener el estado.</span>
+                  ) : null}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
