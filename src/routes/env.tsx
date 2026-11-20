@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { AuthenticatedLayout } from '@/components/layout/authenticated-layout'
-import { ComingSoon } from '@/components/coming-soon'
+import { EnvironmentPage } from '@/features/environment'
 
 export const Route = createFileRoute('/env')({
   component: () => (
     <AuthenticatedLayout>
-      <ComingSoon />
+      <EnvironmentPage />
     </AuthenticatedLayout>
   ),
 })

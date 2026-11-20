@@ -33,6 +33,7 @@ export interface RunOptions {
   project?: string
   grep?: string
   workers?: number | string
+  profileName?: string
   envFile?: string
   useDocker?: boolean
   params?: Record<string, string>
@@ -121,11 +122,13 @@ export function useExecution() {
       project,
       grep,
       workers,
+      profileName,
       envFile,
       useDocker,
       params,
     }: RunOptions) =>
       testsApi.run(testIds, project, grep, workers, {
+        ...(profileName ? { profileName } : {}),
         ...(envFile ? { envFile } : {}),
         ...(useDocker ? { useDocker: true } : {}),
         ...(params && Object.keys(params).length ? { params } : {}),
