@@ -9,6 +9,7 @@ import {
 import { sidebarData } from './data/sidebar-data'
 import { NavGroup } from './nav-group'
 import { NavUser } from './nav-user'
+import { ProfileSwitcher } from '@/features/profile-session/profile-switcher'
 import { TeamSwitcher } from './team-switcher'
 
 export function AppSidebar() {
@@ -19,6 +20,7 @@ export function AppSidebar() {
     <Sidebar collapsible={collapsible} variant={variant}>
       <SidebarHeader>
         <TeamSwitcher teams={sidebarData.teams} />
+        <ProfileSwitcher />
       </SidebarHeader>
       <SidebarContent>
         {sidebarData.navGroups.map((props) => (

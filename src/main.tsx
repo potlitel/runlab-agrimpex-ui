@@ -9,6 +9,7 @@ import {
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { handleServerError } from '@/lib/handle-server-error'
+import { ProfileSessionProvider } from '@/features/profile-session/profile-session-provider'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
 import { ThemeProvider } from './context/theme-provider'
@@ -81,7 +82,9 @@ if (!rootElement.innerHTML) {
         <ThemeProvider>
           <FontProvider>
             <DirectionProvider>
-              <RouterProvider router={router} />
+              <ProfileSessionProvider>
+                <RouterProvider router={router} />
+              </ProfileSessionProvider>
             </DirectionProvider>
           </FontProvider>
         </ThemeProvider>
