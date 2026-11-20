@@ -1,19 +1,30 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, Loader2, Pencil, Play, Plus, RefreshCw, Trash2, X } from 'lucide-react'
+import { Check, Copy, Database, FolderOpen, Loader2, Pencil, Play, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { profileAdminApi } from '@/lib/api'
+import { configApi, profileAdminApi } from '@/lib/api'
 import { profileStore, useProfileStore } from '@/stores/profileStore'
-import type { Profile } from '@/types/contract'
+import type { CreateProfileTestDataMode, Profile } from '@/types/contract'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
+
+type CreateSource = 'global' | CreateProfileTestDataMode
 
 function msg(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback
+}
+
+const MODE_LABEL: Record<CreateProfileTestDataMode, string> = {
+  defaults: 'Rutas globales por defecto',
+  template: 'Copiar del perfil plantilla',
+  active: 'Copiar del perfil activo',
+  none: 'Sin datos (vacío)',
 }
 
 export function ProfileAdminSection() {
@@ -22,9 +33,22 @@ export function ProfileAdminSection() {
   const activeProfileId = useProfileStore((s) => s.activeProfileId)
 
   const [newName, setNewName] = useState('')
+  const [newDataSource, setNewDataSource] = useState<CreateSource>('global')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null)
+
+  const [settingsForm, setSettingsForm] = useState<{
+    createProfileTestDataMode: CreateProfileTestDataMode
+    templateProfileId: string | null
+    testDataDefaults: { txtFolderPath: string; jsonDataPath: string }
+  }>({
+    createProfileTestDataMode: 'none',
+    templateProfileId: null,
+    testDataDefaults: { txtFolderPath: '', jsonDataPath: '' },
+  })
+  const [settingsDirty, setSettingsDirty] = useState(false)
+  const [browsing, setBrowsing] = useState<'txt' | 'json' | null>(null)
 
   const listQuery = useQuery({
     queryKey: ['profiles'],
@@ -32,15 +56,30 @@ export function ProfileAdminSection() {
     retry: false,
   })
 
+  useEffect(() => {
+    if (!listQuery.data) return
+    setSettingsForm({
+      createProfileTestDataMode: listQuery.data.createProfileTestDataMode ?? 'none',
+      templateProfileId: listQuery.data.templateProfileId ?? null,
+      testDataDefaults: {
+        txtFolderPath: listQuery.data.testDataDefaults?.txtFolderPath ?? '',
+        jsonDataPath: listQuery.data.testDataDefaults?.jsonDataPath ?? '',
+      },
+    })
+    setSettingsDirty(false)
+  }, [listQuery.data])
+
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ['profiles'] })
   }
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => profileAdminApi.create(name),
+    mutationFn: ({ name, source }: { name: string; source: CreateSource }) =>
+      profileAdminApi.create(name, source === 'global' ? undefined : { testDataSource: source }),
     onSuccess: (profile) => {
       profileStore.getState().add(profile)
       setNewName('')
+      setNewDataSource('global')
       toast.success(`Perfil creado: ${profile.name}`)
       void refresh()
     },
@@ -93,7 +132,53 @@ export function ProfileAdminSection() {
     onError: (error) => toast.error(msg(error, 'No se pudo eliminar el perfil')),
   })
 
-  const busy = createMutation.isPending || renameMutation.isPending || duplicateMutation.isPending || activateMutation.isPending || deleteMutation.isPending
+  const saveSettingsMutation = useMutation({
+    mutationFn: () =>
+      profileAdminApi.updateSettings({
+        createProfileTestDataMode: settingsForm.createProfileTestDataMode,
+        templateProfileId: settingsForm.templateProfileId,
+        testDataDefaults: settingsForm.testDataDefaults,
+      }),
+    onSuccess: () => {
+      toast.success('Configuración de datos de prueba guardada')
+      setSettingsDirty(false)
+      void refresh()
+    },
+    onError: (error) => toast.error(msg(error, 'No se pudo guardar la configuración')),
+  })
+
+  async function browseDefault(which: 'txt' | 'json') {
+    const key = which === 'txt' ? 'txtFolderPath' : 'jsonDataPath'
+    try {
+      setBrowsing(which)
+      const res = await configApi.browse('folder', settingsForm.testDataDefaults[key] || undefined)
+      if (res.path) {
+        setSettingsForm((p) => ({ ...p, testDataDefaults: { ...p.testDataDefaults, [key]: res.path } }))
+        setSettingsDirty(true)
+      }
+    } catch (e) {
+      toast.error(msg(e, 'No se pudo abrir el explorador'))
+    } finally {
+      setBrowsing(null)
+    }
+  }
+
+  function submitCreate() {
+    const name = newName.trim()
+    if (!name) return
+    createMutation.mutate({ name, source: newDataSource })
+  }
+
+  const busy =
+    createMutation.isPending ||
+    renameMutation.isPending ||
+    duplicateMutation.isPending ||
+    activateMutation.isPending ||
+    deleteMutation.isPending ||
+    saveSettingsMutation.isPending
+
+  const globalModeLabel = MODE_LABEL[settingsForm.createProfileTestDataMode]
+  const templateProfileId = listQuery.data?.templateProfileId ?? settingsForm.templateProfileId
 
   return (
     <>
@@ -103,7 +188,7 @@ export function ProfileAdminSection() {
             <div>
               <CardTitle>Perfiles del dashboard</CardTitle>
               <CardDescription>
-                Administra perfiles, activa el contexto de trabajo y mantén la consistencia con la sesión global.
+                Administra perfiles, activa el contexto de trabajo y define de dónde obtienen sus datos de prueba los perfiles nuevos.
               </CardDescription>
             </div>
             <Button variant='outline' size='sm' onClick={() => void refresh()} disabled={listQuery.isFetching}>
@@ -112,22 +197,42 @@ export function ProfileAdminSection() {
           </div>
         </CardHeader>
         <CardContent className='space-y-4'>
-          <div className='flex flex-col gap-2 sm:flex-row sm:items-end'>
-            <div className='flex-1 space-y-1.5'>
-              <Label htmlFor='settings-new-profile'>Nuevo perfil</Label>
-              <Input
-                id='settings-new-profile'
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder='Nombre del perfil'
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newName.trim()) createMutation.mutate(newName.trim())
-                }}
-              />
+          <div className='space-y-3 rounded-md border p-3'>
+            <div className='grid gap-3 md:grid-cols-[1fr_260px_auto] md:items-end'>
+              <div className='space-y-1.5'>
+                <Label htmlFor='settings-new-profile'>Nuevo perfil</Label>
+                <Input
+                  id='settings-new-profile'
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder='Nombre del perfil'
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submitCreate()
+                  }}
+                />
+              </div>
+              <div className='space-y-1.5'>
+                <Label>Datos de prueba al crear</Label>
+                <Select value={newDataSource} onValueChange={(v) => setNewDataSource(v as CreateSource)}>
+                  <SelectTrigger className='w-full'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='global'>Usar modo global ({globalModeLabel})</SelectItem>
+                    <SelectItem value='defaults'>Rutas globales por defecto</SelectItem>
+                    <SelectItem value='template'>Copiar del perfil plantilla</SelectItem>
+                    <SelectItem value='active'>Copiar del perfil activo</SelectItem>
+                    <SelectItem value='none'>Sin datos (vacío)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={submitCreate} disabled={!newName.trim() || createMutation.isPending}>
+                {createMutation.isPending ? <Loader2 className='size-4 animate-spin' /> : <Plus className='size-4' />} Crear
+              </Button>
             </div>
-            <Button onClick={() => createMutation.mutate(newName.trim())} disabled={!newName.trim() || createMutation.isPending}>
-              {createMutation.isPending ? <Loader2 className='size-4 animate-spin' /> : <Plus className='size-4' />} Crear
-            </Button>
+            <p className='text-xs text-muted-foreground'>
+              Los perfiles duplicados conservan la configuración (incluidas las rutas de datos) del perfil de origen.
+            </p>
           </div>
 
           {listQuery.isError ? (
@@ -137,6 +242,7 @@ export function ProfileAdminSection() {
               {profiles.length === 0 && <p className='text-sm text-muted-foreground'>No hay perfiles.</p>}
               {profiles.map((profile) => {
                 const isActive = profile.id === activeProfileId
+                const isTemplate = profile.id === templateProfileId
                 const isEditing = editingId === profile.id
                 return (
                   <div key={profile.id} className='flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center'>
@@ -180,6 +286,7 @@ export function ProfileAdminSection() {
                           <div className='flex flex-wrap items-center gap-2'>
                             <span className='font-medium'>{profile.name}</span>
                             {isActive && <Badge>Activo</Badge>}
+                            {isTemplate && <Badge variant='secondary'>Plantilla de datos</Badge>}
                           </div>
                           <p className='truncate font-mono text-xs text-muted-foreground'>{profile.id}</p>
                         </div>
@@ -227,6 +334,126 @@ export function ProfileAdminSection() {
               })}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className='flex items-center gap-2'>
+            <Database className='size-5 text-muted-foreground' />
+            <div>
+              <CardTitle>Datos de prueba para perfiles nuevos</CardTitle>
+              <CardDescription>
+                Define cómo obtienen sus rutas de datos (TXT/JSON) los perfiles que se creen desde cero. Las tres estrategias pueden coexistir: elige un modo global y, si quieres, sobreescríbelo al crear cada perfil.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid gap-4 md:grid-cols-2'>
+            <div className='space-y-1.5'>
+              <Label>Modo global por defecto</Label>
+              <Select
+                value={settingsForm.createProfileTestDataMode}
+                onValueChange={(v) => {
+                  setSettingsForm((p) => ({ ...p, createProfileTestDataMode: v as CreateProfileTestDataMode }))
+                  setSettingsDirty(true)
+                }}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='defaults'>Rutas globales por defecto</SelectItem>
+                  <SelectItem value='template'>Copiar del perfil plantilla</SelectItem>
+                  <SelectItem value='active'>Copiar del perfil activo</SelectItem>
+                  <SelectItem value='none'>Sin datos (vacío)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className='text-xs text-muted-foreground'>
+                Se aplica al crear un perfil cuando eliges “Usar modo global”.
+              </p>
+            </div>
+
+            <div className='space-y-1.5'>
+              <Label>Perfil plantilla</Label>
+              <Select
+                value={settingsForm.templateProfileId ?? 'none'}
+                onValueChange={(v) => {
+                  setSettingsForm((p) => ({ ...p, templateProfileId: v === 'none' ? null : v }))
+                  setSettingsDirty(true)
+                }}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue placeholder='Sin plantilla' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='none'>Sin plantilla</SelectItem>
+                  {profiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className='text-xs text-muted-foreground'>
+                Sus rutas de datos (TXT/JSON) se copiarán a los perfiles nuevos creados con el modo “Perfil plantilla”.
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className='space-y-3'>
+            <div>
+              <p className='text-sm font-medium'>Rutas globales por defecto</p>
+              <p className='text-xs text-muted-foreground'>
+                Se aplican a los perfiles nuevos creados con el modo “Rutas globales por defecto”. Apunta a una carpeta compartida para que todos los perfiles (presentes y futuros) usen los mismos datos.
+              </p>
+            </div>
+            <div className='grid gap-3 md:grid-cols-[1fr_auto] md:items-end'>
+              <div className='space-y-1.5'>
+                <Label htmlFor='default-txt-path'>Carpeta de datos TXT (global)</Label>
+                <Input
+                  id='default-txt-path'
+                  value={settingsForm.testDataDefaults.txtFolderPath}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setSettingsForm((p) => ({ ...p, testDataDefaults: { ...p.testDataDefaults, txtFolderPath: value } }))
+                    setSettingsDirty(true)
+                  }}
+                  placeholder='/ruta/compartida/datos-txt'
+                />
+              </div>
+              <Button type='button' variant='outline' onClick={() => void browseDefault('txt')} disabled={browsing === 'txt'}>
+                {browsing === 'txt' ? <Loader2 className='size-4 animate-spin' /> : <FolderOpen className='size-4' />} Explorar
+              </Button>
+            </div>
+            <div className='grid gap-3 md:grid-cols-[1fr_auto] md:items-end'>
+              <div className='space-y-1.5'>
+                <Label htmlFor='default-json-path'>Carpeta de datos JSON (global)</Label>
+                <Input
+                  id='default-json-path'
+                  value={settingsForm.testDataDefaults.jsonDataPath}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setSettingsForm((p) => ({ ...p, testDataDefaults: { ...p.testDataDefaults, jsonDataPath: value } }))
+                    setSettingsDirty(true)
+                  }}
+                  placeholder='/ruta/compartida/datos-json'
+                />
+              </div>
+              <Button type='button' variant='outline' onClick={() => void browseDefault('json')} disabled={browsing === 'json'}>
+                {browsing === 'json' ? <Loader2 className='size-4 animate-spin' /> : <FolderOpen className='size-4' />} Explorar
+              </Button>
+            </div>
+          </div>
+
+          <div className='flex justify-end'>
+            <Button onClick={() => saveSettingsMutation.mutate()} disabled={!settingsDirty || saveSettingsMutation.isPending}>
+              {saveSettingsMutation.isPending ? <Loader2 className='size-4 animate-spin' /> : <Save className='size-4' />} Guardar configuración de datos
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

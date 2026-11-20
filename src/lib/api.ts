@@ -262,7 +262,13 @@ export const jsonDataApi = {
 export const profileAdminApi = {
   list: () => get<ProfileAdminListResponse>('/profile-admin'),
   get: () => get<ProfileAdminListResponse>('/profile-admin'),
-  create: (name: string) => post<Profile>('/profile-admin', { name }),
+  create: (name: string, options?: { testDataSource?: 'defaults' | 'template' | 'active' | 'none' }) =>
+    post<Profile>('/profile-admin', { name, ...(options ?? {}) }),
+  updateSettings: (payload: {
+    templateProfileId?: string | null
+    testDataDefaults?: { txtFolderPath?: string; jsonDataPath?: string }
+    createProfileTestDataMode?: 'defaults' | 'template' | 'active' | 'none'
+  }) => patch<ProfileAdminListResponse>('/profile-admin/settings', payload),
   rename: (id: string, name: string) =>
     patch<{ success: boolean }>(`/profile-admin/${encodeURIComponent(id)}/rename`, { name }),
   update: (id: string, name: string) =>

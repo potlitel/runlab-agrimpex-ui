@@ -28,9 +28,19 @@ export interface Profile {
   [key: string]: unknown
 }
 
+export type CreateProfileTestDataMode = 'defaults' | 'template' | 'active' | 'none'
+
+export interface ProfileTestDataDefaults {
+  txtFolderPath: string
+  jsonDataPath: string
+}
+
 export interface ProfileAdminListResponse {
   activeProfileId: string
   profiles: Profile[]
+  templateProfileId?: string | null
+  testDataDefaults?: ProfileTestDataDefaults
+  createProfileTestDataMode?: CreateProfileTestDataMode
 }
 
 export interface ProfilesStatusItem {
