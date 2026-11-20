@@ -32,21 +32,18 @@ export function ProfileHeaderBadge({ profileName }: Props) {
   return (
     <Badge
       variant='secondary'
-      className='flex max-w-[min(100%,34rem)] items-center gap-1.5'
+      className='flex max-w-[min(100%,34rem)] flex-col items-start gap-1 py-1.5'
       title={title}
     >
-      <User className='size-3.5 shrink-0 opacity-80' />
-      <span className='max-w-[12rem] truncate sm:max-w-[14rem]'>
-        {resolvedName ?? 'Sin perfil activo'}
+      <span className='flex w-full min-w-0 items-center gap-1.5'>
+        <User className='size-3.5 shrink-0 opacity-80' />
+        <span className='truncate'>{resolvedName ?? 'Sin perfil activo'}</span>
       </span>
       {projectPath ? (
-        <>
-          <span className='shrink-0 text-muted-foreground/50'>•</span>
+        <span className='flex w-full min-w-0 items-center gap-1.5'>
           <FolderOpen className='size-3.5 shrink-0 opacity-80' />
-          <span className='min-w-0 max-w-[10rem] truncate font-mono text-[11px] sm:max-w-[16rem]'>
-            {projectPath}
-          </span>
-        </>
+          <span className='truncate font-mono text-[11px]'>{projectPath}</span>
+        </span>
       ) : null}
     </Badge>
   )
