@@ -105,7 +105,7 @@ Si prefieres un solo puerto, construye la UI **sin `VITE_API_URL`** (para que us
 ```bash
 npm run build
 cd ../runlab-agrimpex-api
-QADASH_DIST_DIR=../runlab-agrimpex-ui/dist npm start
+RUNLABQA_DIST_DIR=../runlab-agrimpex-ui/dist npm start
 # http://localhost:3001
 ```
 
@@ -128,8 +128,8 @@ docker compose ps
 
 | Servicio | Contenedor | URL desde el host | Observaciones |
 |---|---|---|---|
-| `qadash-api` | `qadash-api` | <http://localhost:3001> · `/api/docs/` | Healthcheck en `/api/openapi.json`; datos en volumen `qadash-data` |
-| `qadash-ui` | `qadash-ui` | <http://localhost:3002> | Espera a que la API esté `healthy`; sirve `dist` en `:3000` dentro del contenedor |
+| `runlabqa-api` | `runlabqa-api` | <http://localhost:3001> · `/api/docs/` | Healthcheck en `/api/openapi.json`; datos en volumen `runlabqa-data` |
+| `runlabqa-ui` | `runlabqa-ui` | <http://localhost:3002> | Espera a que la API esté `healthy`; sirve `dist` en `:3000` dentro del contenedor |
 
 > ⚠️ `http://localhost:3000` es el stack DAM de referencia (`dam-frontend`), no este dashboard. Usa **`3002`**. Si necesitas sí o sí el `3000`, detén `dam-frontend` y pon `UI_PORT=3000` en `.env`.
 
@@ -142,13 +142,13 @@ La UI se construye con `Dockerfile.npm` (multi-stage, patrón del repo `DeviceAc
 ```bash
 curl -i http://localhost:3001/api/openapi.json     # 200
 curl -i http://localhost:3002/                     # 200
-docker compose logs -f qadash-ui
+docker compose logs -f runlabqa-ui
 ```
 
 Resultado ya verificado en este equipo:
 
 ```text
-qadash-ui   Up   0.0.0.0:3002->3000/tcp
+runlabqa-ui   Up   0.0.0.0:3002->3000/tcp
 HTTP 200 /  ·  <title>RunLab Agrimpex — QA Dashboard</title>
 Bundle: http://localhost:3001/api y http://localhost:3001
 ```
@@ -164,7 +164,7 @@ Para desplegar en otro equipo:
 VITE_API_URL=http://10.0.0.50:3001/api
 VITE_SOCKET_URL=http://10.0.0.50:3001
 
-docker compose up -d --build qadash-ui
+docker compose up -d --build runlabqa-ui
 ```
 
 `src/lib/socket.ts` deriva el origen del socket de `VITE_API_URL`, así que normalmente basta con cambiar esa variable. Reconstruir es obligatorio: cambiar `.env` y hacer solo `restart` no modifica el bundle ya generado.
@@ -173,10 +173,10 @@ docker compose up -d --build qadash-ui
 
 ```bash
 docker compose up -d --build          # construir y levantar todo
-docker compose up -d --build qadash-ui # solo la UI (tras cambiar VITE_*)
-docker compose logs -f qadash-ui
-docker compose restart qadash-ui
-docker compose down                   # conserva qadash-data
+docker compose up -d --build runlabqa-ui # solo la UI (tras cambiar VITE_*)
+docker compose logs -f runlabqa-ui
+docker compose restart runlabqa-ui
+docker compose down                   # conserva runlabqa-data
 docker compose down -v                # BORRA perfiles/reportes de la API
 ```
 
@@ -186,17 +186,87 @@ docker compose down -v                # BORRA perfiles/reportes de la API
 
 ```bash
 docker build -f runlab-agrimpex-ui/Dockerfile.npm \
-  -t qadash-agrimpex-ui \
+  -t runlabqa-agrimpex-ui \
   --build-arg VITE_API_URL=http://localhost:3001/api \
   --build-arg VITE_SOCKET_URL=http://localhost:3001 \
   runlab-agrimpex-ui
 
-docker run -d --name qadash-ui -p 3002:3000 qadash-agrimpex-ui
+docker run -d --name runlabqa-ui -p 3002:3000 runlabqa-agrimpex-ui
 ```
 
 > Compose sigue siendo preferible: añade red compartida, `depends_on` con healthcheck y `restart: unless-stopped`.
 
 Ver [guía completa de onboarding Docker](../docs/ONBOARDING_DOCKER.md).
+
+---
+
+## Docker Compose: referencia detallada
+
+El stack se define en **`../docker-compose.yml`**, en la raíz del workspace. Ese archivo está versionado en el repo de infraestructura junto con `.env.example` y `docs/ONBOARDING_DOCKER.md`. La referencia completa está en el [README raíz](../README.md); aquí se detalla lo que afecta a la UI.
+
+### Servicio `runlabqa-ui`
+
+| Bloque del YAML | Valor / efecto |
+|---|---|
+| `build.context` | `./runlab-agrimpex-ui`. Su `.dockerignore` excluye `node_modules`, `dist`, `.env` local y secretos. |
+| `build.dockerfile` | `Dockerfile.npm`: fase `build` con `node:22-alpine`, `npm ci`, `tsc -b && vite build`; fase `runner` con `serve -s dist -l tcp://0.0.0.0:3000`. |
+| `build.args.VITE_API_URL` | `${VITE_API_URL:-http://localhost:3001/api}`. Se **hornea en el bundle**. |
+| `build.args.VITE_SOCKET_URL` | `${VITE_SOCKET_URL:-http://localhost:3001}`. Origen Socket.io; si se omite, se deriva de `VITE_API_URL`. |
+| `build.args.HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | Proxy para `npm ci` durante el build. |
+| `image` | `runlabqa-agrimpex-ui`. |
+| `container_name` | `runlabqa-ui`. |
+| `restart` | `unless-stopped`. |
+| `ports` | `"${UI_PORT:-3002}:3000"`. Contenedor escucha `3000`; host publica `3002` porque `3000` es DAM. |
+| `depends_on` | `runlabqa-api` con `condition: service_healthy` → la UI espera a `GET /api/openapi.json`. |
+| `networks` | `runlabqa-network` (bridge privada con la API). |
+| `volumes` | Ninguno: el bundle es estático y se reconstruye cuando cambian las URLs. |
+
+### Por qué `VITE_*` exige reconstruir
+
+Vite sustituye `import.meta.env.VITE_*` en tiempo de **build** y genera archivos JS ya resueltos en `dist/`. Por tanto:
+
+- El navegador descarga `http://localhost:3001/api` escrito en el bundle; el contenedor no “lee” esa variable al arrancar.
+- Debe ser una URL alcanzable **desde el navegador**. Si despliegas en otro equipo, usa `http://<IP-del-servidor>:3001/api`.
+- Cambiar `.env` y hacer solo `docker compose restart runlabqa-ui` **no cambia nada**. Hay que hacer:
+
+```bash
+docker compose up -d --build runlabqa-ui
+```
+
+- `src/lib/socket.ts` deriva el origen del socket de `VITE_API_URL`, así que en la mayoría de los casos basta con cambiar esa única variable; `VITE_SOCKET_URL` queda como override explícito.
+
+### Cómo funcionan los `.env` en este YAML
+
+Resumen rápido: Compose lee **`.env` de la raíz** del workspace y aplica `${VAR}` / `${VAR:-default}` en el `docker-compose.yml`. La prioridad es: **shell → `.env` → default del YAML**.
+
+```dotenv
+# .env (raíz, no versionado; plantilla: .env.example)
+UI_PORT=3002
+API_PORT=3001
+VITE_API_URL=http://localhost:3001/api
+VITE_SOCKET_URL=http://localhost:3001
+```
+
+Distinciones que suelen confundir:
+
+1. **`.env` raíz vs `runlab-agrimpex-ui/.env`.** El primero lo lee Compose para el stack Docker. El segundo lo lee Vite solo en `npm run dev` local; en Docker no se usa porque el contenedor no corre Vite.
+2. **Build vs runtime en la UI.** `VITE_*` y los proxies son build-args (`--build`). `UI_PORT` es runtime (`up -d` y ya recrea el contenedor).
+3. **Defaults inline.** `${UI_PORT:-3002}` significa “usa `UI_PORT` si está definida; si no, `3002`”.
+4. **Override puntual.** `UI_PORT=3010 docker compose up -d` publica la UI en `3010` sin tocar archivos.
+5. **Secretos.** `.env` está ignorado por Git en el repo raíz; nunca subas tokens ni credenciales del AUT.
+
+### Variables clave
+
+| Variable | Default | Fase | Efecto |
+|---|---|---|---|
+| `UI_PORT` | `3002` | runtime | Puerto publicado de la UI. |
+| `API_PORT` | `3001` | runtime | Puerto publicado de la API (a la que apunta el bundle). |
+| `VITE_API_URL` | `http://localhost:3001/api` | build | Base REST horneada en el bundle. |
+| `VITE_SOCKET_URL` | `http://localhost:3001` | build | Origen Socket.io (override opcional). |
+| `API_BASE_IMAGE` | `node:22-alpine` | build | Base de la API; no afecta al bundle de la UI. |
+| `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | vacíos | build | npm dentro del build. |
+
+Si vienes de los nombres antiguos `qadash-*`, consulta la [migración del README raíz](../README.md#12-migración-desde-los-antiguos-nombres-qadash-): los servicios, imágenes, contenedores, volumen y red ahora usan el prefijo `runlabqa`.
 
 ---
 
@@ -218,7 +288,7 @@ Para activarla desde la raíz del workspace:
 
 ```bash
 echo 'API_BASE_IMAGE=mcr.microsoft.com/playwright:v1.62.1-noble' >> .env
-docker compose up -d --build qadash-api
+docker compose up -d --build runlabqa-api
 ```
 
 El kit de tests ya está montado en su ruta original, así que los perfiles conservan su `projectPath` sin cambios. El detalle completo está en [Ventaja de la imagen Playwright (API)](../runlab-agrimpex-api/README.md#ventaja-de-la-imagen-playwright).

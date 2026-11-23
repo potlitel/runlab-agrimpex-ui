@@ -16,4 +16,4 @@ Frontend del dashboard QA para gestionar y ejecutar la suite Playwright de Agrim
 
 ## Recordatorios pendientes
 
-- **[A4 — despliegue]** Al servir en producción, el backend busca el build en `QADASH_DIST_DIR` (default actual apunta a `qadash-frontend/dist` del reference). Ver note en `runlab-agrimpex-api/openspec/project.md`.
+- **[A4 — despliegue]** Al servir en producción, el backend busca el build en `RUNLABQA_DIST_DIR` (default: `../runlab-agrimpex-ui/dist`). Ver note en `runlab-agrimpex-api/openspec/project.md`.
