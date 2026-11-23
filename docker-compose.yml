@@ -1,0 +1,109 @@
+# =====================================================================
+#  RunLab Agrimpex (QA Dashboard) — Orquestación Docker
+# =====================================================================
+#  Ejecutar SIEMPRE desde esta carpeta: qa-dashboard/runlab-agrimpex-ui/
+#  (los build.context y el bind mount de perfiles son relativos a este archivo).
+#
+#  Uso:
+#    cp .env.example.stack .env
+#    docker compose up -d --build
+#    docker compose ps
+#    docker compose logs -f
+#    docker compose down          # conserva runlabqa-data y los perfiles
+#    docker compose down -v       # borra runlabqa-data (NO los perfiles del host)
+#
+#  Documentación completa:
+#    "RunLab Agrimpex — Orquestación Docker.md" y docs/ONBOARDING_DOCKER.md
+#
+#  Puertos por defecto:
+#    API  -> http://localhost:3001  (Swagger: /api/docs/)
+#    UI   -> http://localhost:3002
+#
+#  ⚠️ El puerto 3000 ya lo ocupa el stack de referencia DAM
+#     (dam-frontend). Por eso este stack publica la UI en 3002.
+#
+#  ⚠️ Antes de levantar, detén los procesos en host que ocupen 3001/5173
+#     (`start-dev.sh` o `npm run dev`).
+# =====================================================================
+
+services:
+
+  # ======================  API (Express + WS)  ======================
+  runlabqa-api:
+    build:
+      context: ../runlab-agrimpex-api
+      dockerfile: Dockerfile
+      args:
+        # Por defecto usa node:22-alpine (ya descargada).
+        # Para ejecutar Playwright dentro del contenedor, override con:
+        # API_BASE_IMAGE=mcr.microsoft.com/playwright:v1.62.1-noble
+        API_BASE_IMAGE: ${API_BASE_IMAGE:-node:22-alpine}
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-}
+    image: runlabqa-agrimpex-api
+    container_name: runlabqa-api
+    restart: unless-stopped
+    environment:
+      PORT: "3001"
+      RUNLABQA_DATA_DIR: /data
+      RUNLABQA_NOVNC_HOST: ${RUNLABQA_NOVNC_HOST:-host.docker.internal}
+      RUNLABQA_NOVNC_PORT: ${RUNLABQA_NOVNC_PORT:-7900}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+      # Sin token, /api/system/update queda deshabilitado (503).
+      UPDATE_TOKEN: ${UPDATE_TOKEN:-}
+    ports:
+      - "${API_PORT:-3001}:3001"
+    volumes:
+      # Persistencia general (snapshots, artefactos no-perfil, etc.).
+      - runlabqa-data:/data
+      # --- Perfiles previos a la dockerización (bind mount) ---
+      # Conserva index.json, configs, entornos, schedules y reportes que ya
+      # existían en el repo. Este bind mount tiene prioridad sobre
+      # /data/profiles del volumen nombrado.
+      - ${RUNLABQA_PROFILES_DIR:-../runlab-agrimpex-api/profiles}:/data/profiles
+      # --- Kit Playwright configurado en esos perfiles ---
+      # Se monta en la MISMA ruta absoluta para no editar `projectPath`.
+      # Cambia PLAYWRIGHT_KIT_DIR en .env si el kit está en otro sitio.
+      # Sin :ro porque las corridas escriben test-results/playwright-report/.
+      - ${PLAYWRIGHT_KIT_DIR:-/home/potlitel/Trabajo/EICMA/Agrimpex/playwright-kit-profesional}:${PLAYWRIGHT_KIT_DIR:-/home/potlitel/Trabajo/EICMA/Agrimpex/playwright-kit-profesional}
+      # --- Opcional: módulo /api/docker (daemon del host) ---
+      # - /var/run/docker.sock:/var/run/docker.sock
+      # - /usr/bin/docker:/usr/bin/docker:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - runlabqa-network
+
+  # =========================  UI (React)  ==========================
+  runlabqa-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.npm
+      args:
+        # Se hornean en el bundle (VITE_*): deben ser visibles desde el
+        # navegador. Usa la IP del servidor si no es localhost.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3001/api}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:3001}
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-}
+    image: runlabqa-agrimpex-ui
+    container_name: runlabqa-ui
+    restart: unless-stopped
+    ports:
+      - "${UI_PORT:-3002}:3000"
+    depends_on:
+      runlabqa-api:
+        condition: service_healthy
+    networks:
+      - runlabqa-network
+
+volumes:
+  runlabqa-data:
+    name: runlabqa-data
+
+networks:
+  runlabqa-network:
+    name: runlabqa-network
+    driver: bridge

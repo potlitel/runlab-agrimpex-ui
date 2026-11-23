@@ -115,13 +115,13 @@ Ver [Ejecución manual de la API](../runlab-agrimpex-api/README.md#ejecución-ma
 
 ## Ejecución con Docker
 
-El stack completo (API + UI) se levanta desde la **raíz del workspace** (`qa-dashboard/`), no desde esta carpeta. El build ocurre íntegramente dentro de Docker: no hace falta Node/npm en el host ni copiar `node_modules`.
+El stack completo (API + UI) se levanta desde **este repo** (`runlab-agrimpex-ui/`), donde ahora vive el `docker-compose.yml`. El build ocurre íntegramente dentro de Docker: no hace falta Node/npm en el host ni copiar `node_modules`.
 
 ### 1) Arranque estándar
 
 ```bash
-cd /home/potlitel/Trabajo/EICMA/Agrimpex/qa-dashboard   # o: cd .. desde este repo
-cp .env.example .env        # opcional: los defaults ya funcionan
+cd /home/potlitel/Trabajo/EICMA/Agrimpex/qa-dashboard/runlab-agrimpex-ui
+cp .env.example.stack .env  # opcional: los defaults ya funcionan
 docker compose up -d --build
 docker compose ps
 ```
@@ -133,7 +133,7 @@ docker compose ps
 
 > ⚠️ `http://localhost:3000` es el stack DAM de referencia (`dam-frontend`), no este dashboard. Usa **`3002`**. Si necesitas sí o sí el `3000`, detén `dam-frontend` y pon `UI_PORT=3000` en `.env`.
 
-Los perfiles que existían antes de dockerizar se conservan: la API los monta desde `runlab-agrimpex-api/profiles` en `/data/profiles`, y el kit Playwright se monta en su ruta original. Ver [Conservar los perfiles previos (API)](../runlab-agrimpex-api/README.md#5-conservar-los-perfiles-previos-a-la-dockerización).
+Los perfiles que existían antes de dockerizar se conservan: la API los monta desde `../runlab-agrimpex-api/profiles` en `/data/profiles`, y el kit Playwright se monta en su ruta original. Ver [Conservar los perfiles previos (API)](../runlab-agrimpex-api/README.md#5-conservar-los-perfiles-previos-a-la-dockerización).
 
 La UI se construye con `Dockerfile.npm` (multi-stage, patrón del repo `DeviceActivityMonitor`, rama `feat/docker-onboarding`): `npm ci` + `tsc -b && vite build` en la fase build y `serve -s dist -l tcp://0.0.0.0:3000` en la fase runner. Los otros `Dockerfile*` del repo son experimentales.
 
@@ -160,7 +160,7 @@ Bundle: http://localhost:3001/api y http://localhost:3001
 Para desplegar en otro equipo:
 
 ```bash
-# .env de la raíz
+# .env de este repo
 VITE_API_URL=http://10.0.0.50:3001/api
 VITE_SOCKET_URL=http://10.0.0.50:3001
 
@@ -177,7 +177,7 @@ docker compose up -d --build runlabqa-ui # solo la UI (tras cambiar VITE_*)
 docker compose logs -f runlabqa-ui
 docker compose restart runlabqa-ui
 docker compose down                   # conserva runlabqa-data
-docker compose down -v                # BORRA perfiles/reportes de la API
+docker compose down -v                # borra runlabqa-data (no los perfiles del host)
 ```
 
 ### 5) Build y run equivalentes sin Compose
@@ -185,30 +185,30 @@ docker compose down -v                # BORRA perfiles/reportes de la API
 Útil si quieres lanzar solo la UI contra una API que ya está corriendo en `:3001`:
 
 ```bash
-docker build -f runlab-agrimpex-ui/Dockerfile.npm \
+docker build -f Dockerfile.npm \
   -t runlabqa-agrimpex-ui \
   --build-arg VITE_API_URL=http://localhost:3001/api \
   --build-arg VITE_SOCKET_URL=http://localhost:3001 \
-  runlab-agrimpex-ui
+  .
 
 docker run -d --name runlabqa-ui -p 3002:3000 runlabqa-agrimpex-ui
 ```
 
 > Compose sigue siendo preferible: añade red compartida, `depends_on` con healthcheck y `restart: unless-stopped`.
 
-Ver [guía completa de onboarding Docker](../docs/ONBOARDING_DOCKER.md).
+Ver [guía completa de onboarding Docker](docs/ONBOARDING_DOCKER.md).
 
 ---
 
 ## Docker Compose: referencia detallada
 
-El stack se define en **`../docker-compose.yml`**, en la raíz del workspace. Ese archivo está versionado en el repo de infraestructura junto con `.env.example` y `docs/ONBOARDING_DOCKER.md`. La referencia completa está en el [README raíz](../README.md); aquí se detalla lo que afecta a la UI.
+El stack se define en **`docker-compose.yml`**, en este mismo repo, junto con `.env.example.stack` y `docs/ONBOARDING_DOCKER.md`. La referencia completa está en [RunLab Agrimpex — Orquestación Docker](<RunLab Agrimpex — Orquestación Docker.md>); aquí se detalla lo que afecta a la UI.
 
 ### Servicio `runlabqa-ui`
 
 | Bloque del YAML | Valor / efecto |
 |---|---|
-| `build.context` | `./runlab-agrimpex-ui`. Su `.dockerignore` excluye `node_modules`, `dist`, `.env` local y secretos. |
+| `build.context` | `.` (este repo). Su `.dockerignore` excluye `node_modules`, `dist`, `.env` local y secretos. |
 | `build.dockerfile` | `Dockerfile.npm`: fase `build` con `node:22-alpine`, `npm ci`, `tsc -b && vite build`; fase `runner` con `serve -s dist -l tcp://0.0.0.0:3000`. |
 | `build.args.VITE_API_URL` | `${VITE_API_URL:-http://localhost:3001/api}`. Se **hornea en el bundle**. |
 | `build.args.VITE_SOCKET_URL` | `${VITE_SOCKET_URL:-http://localhost:3001}`. Origen Socket.io; si se omite, se deriva de `VITE_API_URL`. |
@@ -237,10 +237,10 @@ docker compose up -d --build runlabqa-ui
 
 ### Cómo funcionan los `.env` en este YAML
 
-Resumen rápido: Compose lee **`.env` de la raíz** del workspace y aplica `${VAR}` / `${VAR:-default}` en el `docker-compose.yml`. La prioridad es: **shell → `.env` → default del YAML**.
+Resumen rápido: Compose lee el **`.env` de este repo** (junto al `docker-compose.yml`) y aplica `${VAR}` / `${VAR:-default}` en el `docker-compose.yml`. La prioridad es: **shell → `.env` → default del YAML**.
 
 ```dotenv
-# .env (raíz, no versionado; plantilla: .env.example)
+# .env (no versionado; plantilla del stack: .env.example.stack)
 UI_PORT=3002
 API_PORT=3001
 VITE_API_URL=http://localhost:3001/api
@@ -249,11 +249,11 @@ VITE_SOCKET_URL=http://localhost:3001
 
 Distinciones que suelen confundir:
 
-1. **`.env` raíz vs `runlab-agrimpex-ui/.env`.** El primero lo lee Compose para el stack Docker. El segundo lo lee Vite solo en `npm run dev` local; en Docker no se usa porque el contenedor no corre Vite.
+1. **Un solo `.env`, dos lectores.** Ahora compose y Vite comparten carpeta: el mismo `.env` lo lee Compose para el stack y Vite en `npm run dev`. En Docker el contenedor no corre Vite: las `VITE_*` ya quedaron horneadas en el bundle.
 2. **Build vs runtime en la UI.** `VITE_*` y los proxies son build-args (`--build`). `UI_PORT` es runtime (`up -d` y ya recrea el contenedor).
 3. **Defaults inline.** `${UI_PORT:-3002}` significa “usa `UI_PORT` si está definida; si no, `3002`”.
 4. **Override puntual.** `UI_PORT=3010 docker compose up -d` publica la UI en `3010` sin tocar archivos.
-5. **Secretos.** `.env` está ignorado por Git en el repo raíz; nunca subas tokens ni credenciales del AUT.
+5. **Secretos.** `.env` está ignorado por Git en este repo; nunca subas tokens ni credenciales del AUT.
 
 ### Variables clave
 
@@ -266,7 +266,7 @@ Distinciones que suelen confundir:
 | `API_BASE_IMAGE` | `node:22-alpine` | build | Base de la API; no afecta al bundle de la UI. |
 | `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | vacíos | build | npm dentro del build. |
 
-Si vienes de los nombres antiguos `qadash-*`, consulta la [migración del README raíz](../README.md#12-migración-desde-los-antiguos-nombres-qadash-): los servicios, imágenes, contenedores, volumen y red ahora usan el prefijo `runlabqa`.
+Si vienes de los nombres antiguos `qadash-*`, consulta la [migración en la guía de orquestación](<RunLab Agrimpex — Orquestación Docker.md#12-migración-desde-los-antiguos-nombres-qadash->): los servicios, imágenes, contenedores, volumen y red ahora usan el prefijo `runlabqa`.
 
 ---
 
@@ -284,7 +284,7 @@ Esta UI **no usa directamente** `mcr.microsoft.com/playwright:v1.62.1-noble`: la
 
 **Coste:** es una imagen grande (≈ 1.7 GB) y requiere descargarla una vez. Si solo usas el dashboard o tus tests apuntan a un grid Selenium remoto (`SELENIUM_REMOTE_URL`), quédate con `node:22-alpine`.
 
-Para activarla desde la raíz del workspace:
+Para activarla desde este repo:
 
 ```bash
 echo 'API_BASE_IMAGE=mcr.microsoft.com/playwright:v1.62.1-noble' >> .env

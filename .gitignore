@@ -39,6 +39,7 @@
 **/.env
 **/.env.*
 !.env.example
+!.env.example.stack
 
 # Archivos de Visual Studio y editores
 .vs/
@@ -47,3 +48,9 @@
 *.user
 *.aps
 *.pdb
+
+# Metadatos de herramientas locales
+.opencode/
+
+# macOS
+.DS_Store
