@@ -2,10 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
   Bug,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  ExternalLink,
   FileArchive,
   FileText,
   Film,
@@ -15,16 +11,9 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -39,42 +28,17 @@ import { Main } from '@/components/layout/main'
 import { ProfileHeaderBadge } from '@/components/profile-header-badge'
 import { useProfileStore } from '@/stores/profileStore'
 import type { EvidenceItem, EvidenceKind } from '@/types/contract'
+import { EvidenceDialog } from './components/evidence-viewer'
+import {
+  evidenceKindLabel as kindLabel,
+  evidenceStatusVariant as statusVariant,
+  formatEvidenceDate as formatDate,
+  formatEvidenceSize as formatSize,
+  shortEvidenceTestId as shortTestId,
+} from './components/evidence-helpers'
 import { useFailureEvidence } from './use-failure-evidence'
 
 const PAGE_SIZE = 24
-
-function formatDate(ms?: number | null) {
-  if (!ms) return '—'
-  const d = new Date(ms)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString()
-}
-
-function formatSize(bytes?: number | null) {
-  if (bytes == null || Number.isNaN(bytes)) return '—'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function kindLabel(kind: EvidenceKind) {
-  if (kind === 'image') return 'Imagen'
-  if (kind === 'video') return 'Video'
-  if (kind === 'trace') return 'Traza'
-  if (kind === 'context') return 'Contexto'
-  return 'Otro'
-}
-
-function statusVariant(status?: string | null) {
-  if (status === 'passed') return 'default' as const
-  if (status === 'failed' || status === 'error') return 'destructive' as const
-  return 'outline' as const
-}
-
-function shortTestId(testId?: string | null) {
-  if (!testId) return '—'
-  const parts = testId.split('::')
-  return parts.slice(1).join(' › ') || testId
-}
 
 export function FailureEvidencePage() {
   const activeProfileId = useProfileStore((s) => s.activeProfileId)
@@ -420,161 +384,6 @@ function EvidenceCard({ item, onOpen }: { item: EvidenceItem; onOpen: (id: strin
         </p>
       </div>
     </button>
-  )
-}
-
-function EvidenceDialog({
-  item,
-  index,
-  total,
-  onClose,
-  onPrev,
-  onNext,
-}: {
-  item: EvidenceItem | null
-  index: number
-  total: number
-  onClose: () => void
-  onPrev: () => void
-  onNext: () => void
-}) {
-  const open = !!item
-
-  useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'ArrowLeft') { e.preventDefault(); onPrev() }
-      if (e.key === 'ArrowRight') { e.preventDefault(); onNext() }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onPrev, onNext])
-
-  return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className='sm:max-w-5xl'>
-        {item && (
-          <>
-            <DialogHeader>
-              <DialogTitle className='truncate pr-8 font-mono text-sm' title={item.displayName || item.name}>
-                {item.displayName || item.name}
-              </DialogTitle>
-              <div className='flex flex-wrap items-center gap-2 pt-1'>
-                <Badge variant='secondary'>{kindLabel(item.kind)}</Badge>
-                {item.status && <Badge variant={statusVariant(item.status)}>{item.status}</Badge>}
-                <Badge variant='outline'>{item.source === 'report' ? 'reporte' : 'carpeta'}</Badge>
-                {index >= 0 && total > 0 && (
-                  <span className='text-xs text-muted-foreground'>{index + 1} / {total}</span>
-                )}
-              </div>
-            </DialogHeader>
-
-            <div className='space-y-3'>
-              <div className='grid gap-2 rounded-md border bg-muted/20 p-3 text-xs sm:grid-cols-2'>
-                <div><span className='text-muted-foreground'>Fecha:</span> {formatDate(item.mtime ?? (item.timestamp ? Date.parse(item.timestamp) : null))}</div>
-                <div><span className='text-muted-foreground'>Tamaño:</span> {formatSize(item.size ?? null)}</div>
-                <div className='truncate sm:col-span-2'><span className='text-muted-foreground'>Test:</span> <span className='font-mono' title={item.testId || ''}>{item.testId ? shortTestId(item.testId) : '—'}</span></div>
-                <div className='flex items-center gap-2 sm:col-span-2'>
-                  <span className='text-muted-foreground'>Reporte:</span>
-                  {item.reportId ? (
-                    <span className='truncate font-mono'>{item.reportId}</span>
-                  ) : '—'}
-                  {item.reportId && (
-                    <Button asChild size='sm' variant='link' className='h-auto p-0'>
-                      <Link to='/reports'>Ir a reportes</Link>
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              <EvidencePreview item={item} />
-
-              <div className='flex flex-wrap items-center justify-between gap-2'>
-                <div className='flex items-center gap-2'>
-                  <Button size='sm' variant='outline' onClick={onPrev} disabled={index <= 0}>
-                    <ChevronLeft className='size-4' /> Anterior
-                  </Button>
-                  <Button size='sm' variant='outline' onClick={onNext} disabled={index < 0 || index >= total - 1}>
-                    Siguiente <ChevronRight className='size-4' />
-                  </Button>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <Button size='sm' variant='outline' asChild>
-                    <a href={item.downloadUrl || item.url} target='_blank' rel='noreferrer'>
-                      <Download className='size-4' /> Descargar/Abrir
-                    </a>
-                  </Button>
-                  <Button size='sm' variant='outline' asChild>
-                    <a href={item.url} target='_blank' rel='noreferrer'>
-                      <ExternalLink className='size-4' /> Abrir en pestaña
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function EvidencePreview({ item }: { item: EvidenceItem }) {
-  const [failed, setFailed] = useState(false)
-  if (item.kind === 'image') {
-    if (failed) {
-      return (
-        <div className='flex flex-col items-center justify-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-10 text-center'>
-          <AlertCircle className='size-8 text-destructive' />
-          <p className='text-sm text-destructive'>No se pudo cargar la imagen.</p>
-        </div>
-      )
-    }
-    return (
-      <div className='overflow-hidden rounded-md border bg-muted/30'>
-        <img
-          src={item.url}
-          alt={item.displayName || item.name}
-          className='max-h-[60vh] w-full object-contain'
-          onError={() => setFailed(true)}
-        />
-      </div>
-    )
-  }
-  if (item.kind === 'video') {
-    return (
-      <div className='overflow-hidden rounded-md border bg-black/90'>
-        <video src={item.url} controls className='max-h-[60vh] w-full' />
-      </div>
-    )
-  }
-  if (item.kind === 'trace') {
-    return (
-      <div className='flex flex-col items-center justify-center gap-3 rounded-md border bg-muted/20 p-10 text-center'>
-        <FileArchive className='size-10 text-muted-foreground' />
-        <div>
-          <p className='font-medium'>Traza de Playwright (.zip)</p>
-          <p className='mt-1 text-sm text-muted-foreground'>Descárgala y ábrela con el visor de trazas de Playwright (p.ej. <span className='font-mono'>npx playwright show-trace</span> o trace.playwright.dev).</p>
-        </div>
-      </div>
-    )
-  }
-  if (item.kind === 'context') {
-    return (
-      <div className='flex flex-col items-center justify-center gap-3 rounded-md border bg-muted/20 p-10 text-center'>
-        <FileText className='size-10 text-muted-foreground' />
-        <div>
-          <p className='font-medium'>Contexto de error</p>
-          <p className='mt-1 text-sm text-muted-foreground'>Archivo de contexto generado por Playwright. Ábrelo o descárgalo para ver el detalle.</p>
-        </div>
-      </div>
-    )
-  }
-  return (
-    <div className='flex flex-col items-center justify-center gap-3 rounded-md border bg-muted/20 p-10 text-center'>
-      <FileText className='size-10 text-muted-foreground' />
-      <p className='text-sm text-muted-foreground'>Vista previa no disponible para este tipo de archivo.</p>
-    </div>
   )
 }
 

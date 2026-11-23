@@ -1,5 +1,7 @@
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { LayoutDashboard, Workflow } from 'lucide-react'
+import { featuresApi } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Header } from '@/components/layout/header'
@@ -8,6 +10,8 @@ import { Main } from '@/components/layout/main'
 import { ProfileHeaderBadge } from '@/components/profile-header-badge'
 import { useProfileStore } from '@/stores/profileStore'
 import { ExecutionConsole } from './components/execution-console'
+import { LastRunCard } from './components/last-run-card'
+import { ProjectContextCard } from './components/project-context-card'
 import { ResultsTable } from './components/results-table'
 import { useExecution } from './use-execution'
 
@@ -20,13 +24,29 @@ export function ExecutionDashboard() {
   return (
     <ExecutionDashboardView
       key={activeProfileId ?? 'none'}
+      profileId={activeProfileId}
       profileName={activeProfile?.name}
     />
   )
 }
 
-function ExecutionDashboardView({ profileName }: { profileName?: string }) {
+function ExecutionDashboardView({
+  profileId,
+  profileName,
+}: {
+  profileId: string | null
+  profileName?: string
+}) {
   const execution = useExecution()
+  const featuresQuery = useQuery({
+    queryKey: ['features', profileId],
+    queryFn: () => featuresApi.get(),
+    staleTime: 60_000,
+    retry: false,
+  })
+  const reportsEnabled = featuresQuery.data?.reports !== false
+  const featuresError =
+    featuresQuery.error instanceof Error ? featuresQuery.error.message : null
 
   return (
     <>
@@ -59,13 +79,40 @@ function ExecutionDashboardView({ profileName }: { profileName?: string }) {
               <Link to='/live-flow'>Ver flujo en vivo</Link>
             </Button>
           </div>
+          <ProjectContextCard
+            profileId={profileId}
+            lastRunOptions={execution.lastRunOptions}
+            compact
+          />
+          <LastRunCard
+            reportId={execution.reportId}
+            timestamp={execution.reportTimestamp}
+            summary={execution.summary}
+            progress={execution.progress}
+            status={execution.lastRunStatus}
+            reportsEnabled={reportsEnabled}
+            featuresError={featuresError}
+            profileName={profileName}
+          />
           <ExecutionConsole
             logs={execution.logs}
             progress={execution.progress}
             running={execution.running}
             summary={execution.summary}
+            summaryPartial={execution.summaryPartial}
+            passRate={execution.passRate}
+            loading={execution.loading}
+            error={execution.error}
+            onRetry={execution.refresh}
+            onClear={execution.clearLogs}
           />
-          <ResultsTable results={execution.results} />
+          <ResultsTable
+            results={execution.results}
+            reportId={execution.reportId}
+            loading={execution.loading}
+            error={execution.error}
+            onRetry={execution.refresh}
+          />
         </div>
       </Main>
     </>

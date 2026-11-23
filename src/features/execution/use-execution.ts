@@ -9,41 +9,19 @@ import type {
   TestTree,
   TestRunRequest,
 } from '@/types/contract'
-
-export type ExecutionLogKind = 'info' | 'error' | 'success' | 'test' | 'output' | 'system'
-
-export interface ExecutionLogEntry {
-  id: string
-  at: string
-  kind: ExecutionLogKind
-  text: string
-}
-
-export interface ExecutionTestResult {
-  id: string
-  status: string
-  duration?: number
-  output?: string
-  errorMsg?: string
-  attachments?: Array<Record<string, unknown>>
-}
-
-export interface RunOptions {
-  testIds: string[]
-  project?: string
-  grep?: string
-  workers?: number | string
-  profileName?: string
-  envFile?: string
-  useDocker?: boolean
-  params?: Record<string, string>
-}
-
-export interface ExecutionProgress {
-  current: number
-  total: number
-  percentage: number
-}
+import {
+  EMPTY_SNAPSHOT,
+  deriveSummaryFromResults,
+  eventTimestamp,
+  mergeExecutionSummary,
+  reduceRunState,
+  type ExecutionLogEntry,
+  type ExecutionLogKind,
+  type ExecutionProgress,
+  type ExecutionTestResult,
+  type RunOptions,
+} from './execution-state'
+import { useExecutionStore } from './execution-store'
 
 const MAX_LOG_LINES = 500
 
@@ -69,16 +47,20 @@ export function useExecution() {
   const activeProfileId = useProfileStore((s) => s.activeProfileId)
 
   const [selected, setSelected] = useState<string[]>([])
-  const [logs, setLogs] = useState<ExecutionLogEntry[]>([])
-  const [results, setResults] = useState<Record<string, ExecutionTestResult>>({})
-  const [summary, setSummary] = useState<ReportSummary | null>(null)
-  const [progress, setProgress] = useState<ExecutionProgress>({
-    current: 0,
-    total: 0,
-    percentage: 0,
-  })
   const [eventRunning, setEventRunning] = useState(false)
   const logCounter = useRef(0)
+
+  const snapshot =
+    useExecutionStore((s) =>
+      activeProfileId ? s.byProfile[activeProfileId] : undefined
+    ) ?? EMPTY_SNAPSHOT
+  const { logs, results, progress, summaryView, run } = snapshot
+  const update = useCallback(
+    (updater: (current: typeof snapshot) => typeof snapshot) => {
+      if (activeProfileId) useExecutionStore.getState().update(activeProfileId, updater)
+    },
+    [activeProfileId]
+  )
 
   const cachedQuery = useQuery({
     queryKey: ['tests', activeProfileId, 'cached'],
@@ -104,9 +86,14 @@ export function useExecution() {
           return !!data.files[file]?.includes(id)
         })
       )
-      setSummary(null)
-      setResults({})
-      setProgress({ current: 0, total: 0, percentage: 0 })
+      update((prev) => ({
+        ...prev,
+        logs: [],
+        results: {},
+        summaryView: null,
+        progress: { current: 0, total: 0, percentage: 0 },
+        run: reduceRunState(prev.run, { type: 'reset' }),
+      }))
       toast.success(
         data.total > 0
           ? `Catálogo actualizado: ${data.total} tests`
@@ -150,53 +137,73 @@ export function useExecution() {
 
   const { onExecution, onTest, onProgress } = useSocket(activeProfileId)
 
-  const applyReport = useCallback(async (reportId?: string, progressOverride?: ExecutionProgress) => {
-    if (!reportId) return
-    try {
-      const report = await reportsApi.get(reportId)
-      const next: Record<string, ExecutionTestResult> = {}
-      for (const test of report.tests ?? []) {
-        next[test.id] = {
-          id: test.id,
-          status: test.status,
-          duration: test.duration,
-          output: test.output,
-          errorMsg: test.errorMsg,
-          attachments: test.attachments,
+  const applyReport = useCallback(
+    async (
+      reportId: string,
+      eventSummary: ReportSummary,
+      progressOverride?: ExecutionProgress
+    ) => {
+      try {
+        const report = await reportsApi.get(reportId)
+        const next: Record<string, ExecutionTestResult> = {}
+        for (const test of report.tests ?? []) {
+          next[test.id] = {
+            id: test.id,
+            status: test.status,
+            duration: test.duration,
+            output: test.output,
+            errorMsg: test.errorMsg,
+            attachments: test.attachments,
+          }
         }
+        const completed = Object.keys(next).length
+        update((prev) => ({
+          ...prev,
+          results: next,
+          summaryView: mergeExecutionSummary(
+            eventSummary,
+            report.summary,
+            { derived: deriveSummaryFromResults(next) }
+          ),
+          progress:
+            progressOverride ?? {
+              current: completed,
+              total: completed,
+              percentage: completed ? 100 : 0,
+            },
+          run: reduceRunState(prev.run, {
+            type: 'reportResolved',
+            timestamp: eventTimestamp(report),
+          }),
+        }))
+      } catch {
+        // El resumen recibido por socket sigue siendo válido aunque el reporte no esté disponible.
+        update((prev) => ({
+          ...prev,
+          summaryView: mergeExecutionSummary(eventSummary, null, {
+            derived: deriveSummaryFromResults(prev.results),
+            detailFailed: true,
+          }),
+          run: reduceRunState(prev.run, { type: 'reportFailed' }),
+        }))
       }
-      setResults(next)
-      const values = Object.values(next)
-      setSummary({
-        ...report.summary,
-        total: values.length,
-        passed: values.filter((test) => test.status === 'passed').length,
-        failed: values.filter((test) => test.status === 'failed').length,
-        errors: values.filter((test) => test.status === 'error').length,
-        skipped: values.filter((test) => test.status === 'skipped').length,
-      })
-      setProgress(
-        progressOverride ?? {
-          current: values.length,
-          total: values.length,
-          percentage: values.length ? 100 : 0,
-        }
-      )
-    } catch {
-      // El resumen recibido por socket sigue siendo válido aunque el reporte no esté disponible.
-    }
-  }, [])
+    },
+    [update]
+  )
 
-  const appendLog = useCallback((kind: ExecutionLogKind, text: string) => {
-    logCounter.current += 1
-    const entry: ExecutionLogEntry = {
-      id: String(logCounter.current),
-      at: new Date().toISOString(),
-      kind,
-      text,
-    }
-    setLogs((prev) => [...prev, entry].slice(-MAX_LOG_LINES))
-  }, [])
+  const appendLog = useCallback(
+    (kind: ExecutionLogKind, text: string) => {
+      logCounter.current += 1
+      const entry: ExecutionLogEntry = {
+        id: String(logCounter.current),
+        at: new Date().toISOString(),
+        kind,
+        text,
+      }
+      update((prev) => ({ ...prev, logs: [...prev.logs, entry].slice(-MAX_LOG_LINES) }))
+    },
+    [update]
+  )
 
   useEffect(() => {
     if (!activeProfileId) return
@@ -204,9 +211,13 @@ export function useExecution() {
     const unsubscribeExecution = onExecution({
       started: (event) => {
         setEventRunning(true)
-        setSummary(null)
-        setResults({})
-        setProgress({ current: 0, total: event.total, percentage: 0 })
+        update((prev) => ({
+          ...prev,
+          results: {},
+          summaryView: null,
+          progress: { current: 0, total: event.total, percentage: 0 },
+          run: reduceRunState(prev.run, { type: 'started' }),
+        }))
         appendLog('system', `Ejecución iniciada (${event.total} tests)`)
       },
       preparing: (event) => appendLog('info', event.message),
@@ -217,47 +228,66 @@ export function useExecution() {
       },
       completed: (event) => {
         setEventRunning(false)
-        setSummary(event.summary)
-        setProgress({
+        const progress: ExecutionProgress = {
           current: event.summary.total,
           total: event.summary.total,
           percentage: 100,
-        })
+        }
+        update((prev) => ({
+          ...prev,
+          summaryView: mergeExecutionSummary(event.summary, null, {
+            derived: deriveSummaryFromResults(prev.results),
+          }),
+          progress,
+          run: reduceRunState(prev.run, {
+            type: 'completed',
+            reportId: event.reportId,
+            timestamp: eventTimestamp(event),
+          }),
+        }))
         queryClient.setQueryData(['tests', activeProfileId, 'status'], { running: false })
         appendLog(
           'success',
           `Ejecución completada: ${event.summary.passed} pasados, ${event.summary.failed} fallidos`
         )
-        void applyReport(event.reportId)
+        void applyReport(event.reportId, event.summary)
       },
       aborted: (event) => {
         setEventRunning(false)
-        setSummary(event.summary)
-        setProgress({
+        const progress: ExecutionProgress = {
           current: event.completed,
           total: event.total,
           percentage: event.total
             ? Math.round((event.completed / event.total) * 100)
             : 0,
-        })
+        }
+        update((prev) => ({
+          ...prev,
+          summaryView: mergeExecutionSummary(event.summary, null, {
+            derived: deriveSummaryFromResults(prev.results),
+          }),
+          progress,
+          run: reduceRunState(prev.run, {
+            type: 'aborted',
+            reportId: event.reportId,
+            timestamp: eventTimestamp(event),
+          }),
+        }))
         queryClient.setQueryData(['tests', activeProfileId, 'status'], { running: false })
         appendLog('error', `Ejecución abortada (${event.completed}/${event.total})`)
-        void applyReport(event.reportId, {
-          current: event.completed,
-          total: event.total,
-          percentage: event.total
-            ? Math.round((event.completed / event.total) * 100)
-            : 0,
-        })
+        void applyReport(event.reportId, event.summary, progress)
       },
     })
 
     const unsubscribeTest = onTest({
       started: (event) => {
         appendLog('test', `▶ ${event.id}`)
-        setResults((prev) => ({
+        update((prev) => ({
           ...prev,
-          [event.id]: { ...prev[event.id], id: event.id, status: 'running' },
+          results: {
+            ...prev.results,
+            [event.id]: { ...prev.results[event.id], id: event.id, status: 'running' },
+          },
         }))
       },
       completed: (event) => {
@@ -271,22 +301,27 @@ export function useExecution() {
               : 'info',
           `${event.id} · ${event.status}${suffix}`
         )
-        setResults((prev) => ({
+        update((prev) => ({
           ...prev,
-          [event.id]: { ...prev[event.id], ...event },
+          results: {
+            ...prev.results,
+            [event.id]: { ...prev.results[event.id], ...event },
+          },
         }))
       },
       output: (event) => appendLog('output', `${event.id}: ${event.line}`),
     })
 
-    const unsubscribeProgress = onProgress((event) => setProgress(event))
+    const unsubscribeProgress = onProgress((event) =>
+      update((prev) => ({ ...prev, progress: event }))
+    )
 
     return () => {
       unsubscribeExecution()
       unsubscribeTest()
       unsubscribeProgress()
     }
-  }, [activeProfileId, onExecution, onTest, onProgress, appendLog, applyReport, queryClient])
+  }, [activeProfileId, onExecution, onTest, onProgress, appendLog, applyReport, queryClient, update])
 
   const tree = cachedQuery.data
   const selectedTests = useMemo(
@@ -313,7 +348,13 @@ export function useExecution() {
     selectedTests,
     logs,
     results,
-    summary,
+    summary: summaryView?.summary ?? null,
+    summaryPartial: summaryView?.partial ?? false,
+    passRate: summaryView?.passRate ?? 0,
+    reportId: run.reportId,
+    reportTimestamp: run.reportTimestamp,
+    lastRunStatus: run.lastRunStatus,
+    lastRunOptions: run.lastRunOptions,
     progress,
     refresh: () => void collectMutation.mutateAsync().catch(() => undefined),
     toggleTest: (id: string) =>
@@ -327,24 +368,34 @@ export function useExecution() {
           : prev.filter((value) => !ids.includes(value))
       ),
     clearSelection: () => setSelected([]),
+    clearLogs: () => update((prev) => ({ ...prev, logs: [] })),
     run: (options: RunOptions) => {
       if (!options.testIds.length) {
         toast.error('Selecciona al menos un test')
         return
       }
+      useExecutionStore.getState().patchRun(activeProfileId ?? 'none', (current) =>
+        reduceRunState(current, { type: 'launched', options })
+      )
       void runMutation.mutateAsync(options).catch(() => undefined)
     },
     abort: () => void abortMutation.mutateAsync().catch(() => undefined),
     parseParams,
     reset: () => {
       setSelected([])
-      setLogs([])
-      setResults({})
-      setSummary(null)
-      setProgress({ current: 0, total: 0, percentage: 0 })
+      setEventRunning(false)
+      if (activeProfileId) useExecutionStore.getState().clear(activeProfileId)
     },
   }
 }
 
 export type UseExecutionReturn = ReturnType<typeof useExecution>
+export type {
+  ExecutionLogEntry,
+  ExecutionLogKind,
+  ExecutionProgress,
+  ExecutionTestResult,
+  LastRunOptions,
+  RunOptions,
+} from './execution-state'
 export type { TestTree, TestRunRequest }
