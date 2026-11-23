@@ -130,7 +130,10 @@ function FailureEvidenceView({ profileName }: { profileName?: string }) {
     return filtered.slice(start, start + PAGE_SIZE)
   }, [filtered, safePage])
 
-  useEffect(() => { setPage(1) }, [search, kind, source, status, groupBy])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPage(1)
+  }, [search, kind, source, status, groupBy])
 
   const selectedIndex = filtered.findIndex((i) => i.id === evidence.selectedId)
   const selectedItem = selectedIndex >= 0 ? filtered[selectedIndex] : null
@@ -318,8 +321,8 @@ function EvidenceGroups({
     if (groupBy === 'none') return [{ key: 'all', label: '', items }]
     const map = new Map<string, EvidenceItem[]>()
     for (const it of items) {
-      let key = 'sin-dato'
-      let label = 'Sin información'
+      let key: string
+      let label: string
       if (groupBy === 'report') {
         key = it.reportId || 'sin-reporte'
         label = it.reportId ? `Reporte: ${it.reportId}` : 'Sin reporte (carpeta)'

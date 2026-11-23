@@ -1,4 +1,6 @@
-import { Download, ExternalLink, ImageIcon } from 'lucide-react'
+import { useState } from 'react'
+import { Download, ExternalLink, FileDown, ImageIcon, SlidersHorizontal } from 'lucide-react'
+import { toast } from 'sonner'
 import { reportsApi } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +22,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { ReportAttachment, ReportDetail, ReportListItem } from '@/types/contract'
+import { RUN_PDF_SECTIONS, exportRunPdf, type RunExportSection } from '../pdf/export-reports'
+import { ExportPdfDialog } from './export-pdf-dialog'
 
 type ReportDetailSheetProps = {
   open: boolean
@@ -27,6 +31,7 @@ type ReportDetailSheetProps = {
   detail: ReportDetail | null
   loading: boolean
   error: string | null
+  profileName?: string
   onOpenChange: (open: boolean) => void
 }
 
@@ -56,11 +61,32 @@ export function ReportDetailSheet({
   detail,
   loading,
   error,
+  profileName,
   onOpenChange,
 }: ReportDetailSheetProps) {
+  const [exporting, setExporting] = useState(false)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
   const reportId = report?.id ?? detail?.id ?? null
   const summary = detail?.summary ?? report?.summary
   const tests = detail?.tests ?? []
+
+  const handleExport = async (sections?: RunExportSection[]) => {
+    if (!reportId) return
+    setExporting(true)
+    try {
+      await exportRunPdf({
+        reportId,
+        profileName,
+        sections,
+        fallbackReport: detail ?? report,
+      })
+      toast.success('PDF generado correctamente')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo generar el PDF')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -88,6 +114,22 @@ export function ReportDetailSheet({
 
             {reportId && (
               <div className='flex flex-wrap items-center gap-2'>
+                <Button
+                  variant='default'
+                  size='sm'
+                  onClick={() => void handleExport()}
+                  disabled={exporting}
+                >
+                  <FileDown className='size-4' /> {exporting ? 'Generando…' : 'Exportar PDF'}
+                </Button>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => setCustomizeOpen(true)}
+                  disabled={exporting}
+                >
+                  <SlidersHorizontal className='size-4' /> Personalizar PDF…
+                </Button>
                 <Button variant='outline' size='sm' asChild>
                   <a href={reportsApi.downloadJsonUrl(reportId)} target='_blank' rel='noreferrer'>
                     <Download className='size-4' /> JSON
@@ -183,6 +225,25 @@ export function ReportDetailSheet({
             )}
           </div>
         </ScrollArea>
+
+        <ExportPdfDialog<RunExportSection>
+          key={customizeOpen ? `run-${reportId ?? 'none'}` : 'run-closed'}
+          open={customizeOpen}
+          onOpenChange={setCustomizeOpen}
+          title='Personalizar PDF de corrida'
+          description='Selecciona las secciones que quieres incluir en el PDF integral.'
+          sections={[
+            { id: 'cover', label: 'Portada', description: 'Perfil, reporte, fecha y generación.' },
+            { id: 'summary', label: 'Resumen ejecutivo', description: 'Totales, pasados, fallidos y duración.' },
+            { id: 'tests', label: 'Resultados por test', description: 'Estado, duración y error/salida.' },
+            { id: 'evidence', label: 'Evidencias', description: 'Imágenes adjuntas y otros adjuntos listados.' },
+            { id: 'footer', label: 'Pie', description: 'Fecha de generación y paginación.' },
+          ]}
+          defaultSections={[...RUN_PDF_SECTIONS]}
+          onConfirm={async (sections) => {
+            await handleExport(sections)
+          }}
+        />
       </SheetContent>
     </Sheet>
   )

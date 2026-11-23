@@ -58,6 +58,7 @@ export function ProfileAdminSection() {
 
   useEffect(() => {
     if (!listQuery.data) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSettingsForm({
       createProfileTestDataMode: listQuery.data.createProfileTestDataMode ?? 'none',
       templateProfileId: listQuery.data.templateProfileId ?? null,

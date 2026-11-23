@@ -220,6 +220,115 @@ export interface ReportsAnalytics {
   [key: string]: unknown
 }
 
+// ── Report PDF export (contrato C3a esperado) ───────────────────────────
+export type ReportRunExportSectionId =
+  | 'cover'
+  | 'summary'
+  | 'tests'
+  | 'evidence'
+  | 'footer'
+
+export type ReportAnalyticsExportSectionId =
+  | 'cover'
+  | 'kpis'
+  | 'trend'
+  | 'byFile'
+  | 'recentRuns'
+  | 'footer'
+
+export interface ReportExportProfile {
+  id?: string
+  name?: string
+  [key: string]: unknown
+}
+
+export interface ReportExportAttachment {
+  name?: string
+  contentType?: string
+  path?: string
+  assetPath?: string
+  assetUrl?: string
+  kind?: 'image' | 'other' | string
+  [key: string]: unknown
+}
+
+export interface ReportExportTest {
+  id: string
+  status: 'passed' | 'failed' | 'error' | 'skipped' | string
+  duration?: number
+  output?: string
+  errorMsg?: string
+  attachments?: ReportExportAttachment[]
+  project?: string
+  [key: string]: unknown
+}
+
+export interface ReportRunExportPayload {
+  type: 'run' | string
+  generatedAt?: string
+  profile?: ReportExportProfile
+  report: {
+    id: string
+    timestamp?: string
+    [key: string]: unknown
+  }
+  summary: ReportSummary
+  tests: ReportExportTest[]
+  sections?: ReportRunExportSectionId[]
+  source?: string
+  [key: string]: unknown
+}
+
+export interface ReportAnalyticsTimelinePoint {
+  timestamp?: string
+  label?: string
+  passed?: number
+  failed?: number
+  errors?: number
+  skipped?: number
+  total?: number
+  duration?: number
+  [key: string]: unknown
+}
+
+export interface ReportAnalyticsByFileRow {
+  file?: string
+  name?: string
+  total?: number
+  passed?: number
+  failed?: number
+  errors?: number
+  skipped?: number
+  passRate?: number
+  duration?: number
+  [key: string]: unknown
+}
+
+export interface ReportAnalyticsRecentRun {
+  id: string
+  timestamp?: string
+  summary?: ReportSummary
+  status?: string
+  [key: string]: unknown
+}
+
+export interface ReportAnalyticsExportPayload {
+  type: 'analytics' | string
+  generatedAt?: string
+  profile?: ReportExportProfile
+  summary: ReportsAnalytics
+  timeline?: ReportAnalyticsTimelinePoint[]
+  byFile?: ReportAnalyticsByFileRow[]
+  recentRuns?: ReportAnalyticsRecentRun[]
+  sections?: ReportAnalyticsExportSectionId[]
+  source?: string
+  [key: string]: unknown
+}
+
+export type ReportPdfExportOptions<T extends string = string> = {
+  sections?: T[]
+}
+
 // ── Env / variables ──────────────────────────────────────────────────────
 export interface EnvVar {
   key?: string

@@ -1,9 +1,16 @@
 import { useState } from 'react'
-import { Eye, ImageIcon } from 'lucide-react'
+import { Eye, FileDown, ImageIcon, SlidersHorizontal } from 'lucide-react'
+import { toast } from 'sonner'
 import { reportsApi } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -13,11 +20,14 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { ReportListItem } from '@/types/contract'
+import { RUN_PDF_SECTIONS, exportRunPdf, type RunExportSection } from '../pdf/export-reports'
+import { ExportPdfDialog } from './export-pdf-dialog'
 
 type ReportsListProps = {
   reports: ReportListItem[]
   loading: boolean
   error: string | null
+  profileName?: string
   onSelect: (id: string) => void
 }
 
@@ -69,8 +79,28 @@ export function ReportsList({
   reports,
   loading,
   error,
+  profileName,
   onSelect,
 }: ReportsListProps) {
+  const [exportingId, setExportingId] = useState<string | null>(null)
+  const [customizeReport, setCustomizeReport] = useState<ReportListItem | null>(null)
+
+  const handleDirectExport = async (report: ReportListItem) => {
+    setExportingId(report.id)
+    try {
+      await exportRunPdf({
+        reportId: report.id,
+        profileName,
+        fallbackReport: report,
+      })
+      toast.success('PDF generado correctamente')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo generar el PDF')
+    } finally {
+      setExportingId(null)
+    }
+  }
+
   return (
     <Card>
       <CardHeader className='border-b pb-4'>
@@ -113,6 +143,7 @@ export function ReportsList({
               {reports.map((report) => {
                 const failed = (report.summary.failed ?? 0) + (report.summary.errors ?? 0)
                 const preview = report.summary.previewImage
+                const exporting = exportingId === report.id
                 return (
                   <TableRow key={report.id}>
                     <TableCell>
@@ -137,10 +168,26 @@ export function ReportsList({
                       {report.summary.duration != null ? `${report.summary.duration.toFixed(1)}s` : '—'}
                     </TableCell>
                     <TableCell>
-                      <div className='flex justify-end'>
+                      <div className='flex justify-end gap-1'>
                         <Button size='sm' variant='ghost' onClick={() => onSelect(report.id)}>
                           <Eye className='size-4' /> Ver
                         </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size='sm' variant='outline' disabled={exporting}>
+                              <FileDown className='size-4' />
+                              {exporting ? '…' : 'PDF'}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align='end'>
+                            <DropdownMenuItem onClick={() => void handleDirectExport(report)}>
+                              <FileDown className='size-4' /> Exportar PDF integral
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setCustomizeReport(report)}>
+                              <SlidersHorizontal className='size-4' /> Personalizar PDF…
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -150,6 +197,34 @@ export function ReportsList({
           </Table>
         )}
       </CardContent>
+
+      <ExportPdfDialog<RunExportSection>
+        key={customizeReport?.id ?? 'closed'}
+        open={customizeReport != null}
+        onOpenChange={(open) => {
+          if (!open) setCustomizeReport(null)
+        }}
+        title='Personalizar PDF de corrida'
+        description='Selecciona las secciones que quieres incluir en el PDF integral.'
+        sections={[
+          { id: 'cover', label: 'Portada', description: 'Perfil, reporte, fecha y generación.' },
+          { id: 'summary', label: 'Resumen ejecutivo', description: 'Totales, pasados, fallidos y duración.' },
+          { id: 'tests', label: 'Resultados por test', description: 'Estado, duración y error/salida.' },
+          { id: 'evidence', label: 'Evidencias', description: 'Imágenes adjuntas y otros adjuntos listados.' },
+          { id: 'footer', label: 'Pie', description: 'Fecha de generación y paginación.' },
+        ]}
+        defaultSections={[...RUN_PDF_SECTIONS]}
+        onConfirm={async (sections) => {
+          if (!customizeReport) return
+          await exportRunPdf({
+            reportId: customizeReport.id,
+            profileName,
+            sections,
+            fallbackReport: customizeReport,
+          })
+          toast.success('PDF generado correctamente')
+        }}
+      />
     </Card>
   )
 }
