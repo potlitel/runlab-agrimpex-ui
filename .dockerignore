@@ -11,3 +11,7 @@ dist-ssr
 coverage
 .nyc_output
 *.tsbuildinfo
+.opencode/
+openspec/
+docs/
+CHANGELOG.md

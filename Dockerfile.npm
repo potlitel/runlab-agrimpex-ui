@@ -1,39 +1,65 @@
-# Fase de construcción - usando npm (funciona mejor con el proxy corporativo)
-FROM node:22-alpine AS build
+# =====================================================================
+#  RunLab Agrimpex — UI (React + Vite)
+# =====================================================================
+#  Dockerfile canónico ( Patrón del repo DeviceActivityMonitor, rama
+#  feat/docker-onboarding ). Los otros Dockerfile* del repo son
+#  experimentales/históricos: ver docs/ONBOARDING_DOCKER.md.
+#
+#  Vite requiere Node >= 20.19 o >= 22.12 (tiene @vitejs/plugin-react-swc).
+#  Se usa node:22-alpine igual que en la referencia.
+# =====================================================================
 
-ENV HTTP_PROXY=http://172.16.65.61:3128
-ENV HTTPS_PROXY=http://172.16.65.61:3128
-ENV NO_PROXY=localhost,127.0.0.1,::1
+ARG NODE_IMAGE=node:22-alpine
+FROM ${NODE_IMAGE} AS build
+
+# Proxy opcional (npm lo respeta como HTTPS_PROXY). Inyectar con
+# --build-arg HTTP_PROXY=... / HTTPS_PROXY=... cuando haga falta.
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ARG NO_PROXY=
+ENV HTTP_PROXY=$HTTP_PROXY \
+    HTTPS_PROXY=$HTTPS_PROXY \
+    NO_PROXY=$NO_PROXY
 
 WORKDIR /app
 
-COPY package.json .npmrc ./
-
-# Instalar dependencias (incluye devDependencies: typescript, vite, plugins)
-RUN npm install --no-audit --no-fund --loglevel=warn
+# lockfile + .npmrc primero para reutilizar la caché de npm.
+# NO definir NODE_ENV=production aquí: npm omitiría devDependencies
+# (typescript, vite) y `tsc -b && vite build` fallaría.
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci --no-audit --no-fund --loglevel=warn
 
 COPY . .
 
-# URL de la API horneada en build (Vite expone vars VITE_*)
-ARG VITE_API_URL=http://localhost:8081/api
-ENV VITE_API_URL=$VITE_API_URL
+# Vite hornea las variables VITE_* en el bundle en TIEMPO DE BUILD.
+# Deben ser alcanzables desde el NAVEGADOR, no desde el contenedor.
+ARG VITE_API_URL=http://localhost:3001/api
+ARG VITE_SOCKET_URL=http://localhost:3001
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_SOCKET_URL=$VITE_SOCKET_URL
 
-# Construir la aplicación (tsc type-check + vite build con rollup)
+# package.json: "build": "tsc -b && vite build" (type-check + bundle)
 RUN npm run build
 
-# Fase de ejecución
-FROM node:22-alpine AS runner
+# ---------------------------------------------------------------------
+#  Runtime: solo el bundle estático + serve (SPA fallback con -s).
+# ---------------------------------------------------------------------
+FROM ${NODE_IMAGE} AS runner
+
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ARG NO_PROXY=
+ENV HTTP_PROXY=$HTTP_PROXY \
+    HTTPS_PROXY=$HTTPS_PROXY \
+    NO_PROXY=$NO_PROXY \
+    NODE_ENV=production
 
 WORKDIR /app
 
-ENV HTTP_PROXY=http://172.16.65.61:3128
-ENV HTTPS_PROXY=http://172.16.65.61:3128
-ENV NO_PROXY=localhost,127.0.0.1,::1
-
-RUN npm install -g serve
+RUN npm install -g serve@14.2.4 --no-audit --no-fund --loglevel=warn
 
 COPY --from=build /app/dist ./dist
 
 EXPOSE 3000
 
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["serve", "-s", "dist", "-l", "tcp://0.0.0.0:3000"]
