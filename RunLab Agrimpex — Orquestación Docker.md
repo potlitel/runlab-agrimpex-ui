@@ -34,21 +34,26 @@ La infraestructura del stack vive **dentro del repo de la UI**. La carpeta
 
 ```text
 qa-dashboard/
-├── runlab-agrimpex-api/              ← repo Git independiente (API)
-└── runlab-agrimpex-ui/               ← repo Git (UI + infraestructura del stack)
-    ├── docker-compose.yml            ← define TODO el stack
-    ├── .env                          ← variables locales que lee Compose (NO versionado)
-    ├── .env.example.stack            ← plantilla completa del stack (sí se versiona)
-    ├── .env.example                  ← plantilla VITE_* para el dev local de Vite
-    ├── RunLab Agrimpex — Orquestación Docker.md   ← esta guía
-    ├── start-dev.sh                  ← arranque manual API + UI en el host
-    ├── docs/
-    │   ├── ONBOARDING_DOCKER.md      ← onboarding paso a paso
-    │   └── creative-direction.md
-    └── ...                           ← código de la UI
+├── runlab-agrimpex-api/          ← repo Git (API)
+└── runlab-agrimpex-ui/           ← repo Git (UI + infraestructura)
+    ├── docker-compose.yml
+    ├── .env                      ← creado, ignorado por Git
+    ├── .env.example.stack        ← plantilla completa del stack
+    ├── .env.example              ← se conserva (solo VITE_*, dev local)
+    ├── RunLab Agrimpex — Orquestación Docker.md
+    ├── start-dev.sh
+    └── docs/
+        ├── ONBOARDING_DOCKER.md
+        └── creative-direction.md
 ```
 
-- El `docker-compose.yml` debe ejecutarse **desde `runlab-agrimpex-ui/`**: los `build.context` son relativos a este archivo (`../runlab-agrimpex-api` para la API y `.` para la UI).
+> ⚠️ **Directorio de trabajo:** los comandos `docker compose ...` ahora se
+> ejecutan desde **`qa-dashboard/runlab-agrimpex-ui/`**, no desde la raíz
+> `qa-dashboard/`. Es ahí donde viven el `docker-compose.yml` y el `.env` que
+> Compose lee. Si `docker compose ps` sale vacío, casi siempre es por estar en
+> el directorio equivocado.
+
+- Los `build.context` son relativos al `docker-compose.yml`: `../runlab-agrimpex-api` para la API y `.` para la UI.
 - `.env` **no** se versiona; `.env.example.stack` sí. El `.env.example` histórico de la UI sigue siendo la plantilla de Vite para desarrollo local.
 - `runlab-agrimpex-api/` conserva su propio `.git` y su `README.md`.
 
