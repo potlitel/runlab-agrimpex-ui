@@ -208,6 +208,7 @@ export function AnalyticsOverview({ analytics, loading, error }: AnalyticsOvervi
                     fill='#22c55e'
                     radius={[0, 0, 0, 0]}
                     maxBarSize={44}
+                    background={{ fill: 'transparent' }}
                   />
                   <Bar
                     dataKey='failed'
@@ -216,6 +217,7 @@ export function AnalyticsOverview({ analytics, loading, error }: AnalyticsOvervi
                     fill='#ef4444'
                     radius={[4, 4, 0, 0]}
                     maxBarSize={44}
+                    background={{ fill: 'transparent' }}
                   />
                 </BarChart>
               </ResponsiveContainer>
