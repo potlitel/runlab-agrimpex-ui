@@ -133,6 +133,8 @@ docker compose ps
 
 > ⚠️ `http://localhost:3000` es el stack DAM de referencia (`dam-frontend`), no este dashboard. Usa **`3002`**. Si necesitas sí o sí el `3000`, detén `dam-frontend` y pon `UI_PORT=3000` en `.env`.
 
+Los perfiles que existían antes de dockerizar se conservan: la API los monta desde `runlab-agrimpex-api/profiles` en `/data/profiles`, y el kit Playwright se monta en su ruta original. Ver [Conservar los perfiles previos (API)](../runlab-agrimpex-api/README.md#5-conservar-los-perfiles-previos-a-la-dockerización).
+
 La UI se construye con `Dockerfile.npm` (multi-stage, patrón del repo `DeviceActivityMonitor`, rama `feat/docker-onboarding`): `npm ci` + `tsc -b && vite build` en la fase build y `serve -s dist -l tcp://0.0.0.0:3000` en la fase runner. Los otros `Dockerfile*` del repo son experimentales.
 
 ### 2) Verificación
@@ -219,7 +221,7 @@ echo 'API_BASE_IMAGE=mcr.microsoft.com/playwright:v1.62.1-noble' >> .env
 docker compose up -d --build qadash-api
 ```
 
-Además, monta el kit de tests y pon `projectPath=/workspace/playwright-kit-profesional` en la config del perfil. El detalle completo está en [Ventaja de la imagen Playwright (API)](../runlab-agrimpex-api/README.md#ventaja-de-la-imagen-playwright).
+El kit de tests ya está montado en su ruta original, así que los perfiles conservan su `projectPath` sin cambios. El detalle completo está en [Ventaja de la imagen Playwright (API)](../runlab-agrimpex-api/README.md#ventaja-de-la-imagen-playwright).
 
 ---
 
