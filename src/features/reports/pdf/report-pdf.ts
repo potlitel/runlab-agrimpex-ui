@@ -151,7 +151,7 @@ function addFooter(doc: PdfDoc, generatedAt: string) {
 }
 
 function addSectionTitle(doc: PdfDoc, text: string, y: number): number {
-  let yy = ensureSpace(doc, y, 14)
+  const yy = ensureSpace(doc, y, 14)
   doc.setFillColor(241, 245, 249)
   doc.rect(PAGE_MARGIN, yy - 5, CONTENT_WIDTH, 8, 'F')
   doc.setFont('helvetica', 'bold')
@@ -162,20 +162,6 @@ function addSectionTitle(doc: PdfDoc, text: string, y: number): number {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(10)
   return yy + 9
-}
-
-function addKeyValue(doc: PdfDoc, label: string, value: string, y: number): number {
-  const yy = ensureSpace(doc, y, 8)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(...BRAND.muted)
-  doc.text(`${label}:`, PAGE_MARGIN, yy)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(30, 41, 59)
-  const lines = doc.splitTextToSize(sanitizeText(value, 220), CONTENT_WIDTH - 42)
-  doc.text(lines, PAGE_MARGIN + 40, yy)
-  doc.setTextColor(0, 0, 0)
-  return yy + Math.max(6, lines.length * 4.8)
 }
 
 function tableDefaults() {
@@ -481,7 +467,6 @@ export async function generateRunPdf(
       doc.setTextColor(...BRAND.muted)
       doc.text('No hay evidencias adjuntas.', PAGE_MARGIN, y)
       doc.setTextColor(0, 0, 0)
-      y += 8
     } else {
       for (const att of allAttachments) {
         y = ensureSpace(doc, y, 58)

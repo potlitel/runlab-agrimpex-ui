@@ -13,13 +13,14 @@ Restricciones relevantes:
 
 **Goals:**
 - Habilitar exportación PDF integral por corrida y analítica agregada con UX U3 (descarga directa + personalizar secciones).
+- Habilitar compartición de PDFs por WhatsApp y correo electrónico desde corrida y analítica, con Web Share API cuando haya soporte y fallbacks compatibles cuando no.
 - Consumir un contrato de exportación normalizado y generar el PDF en frontend.
 - Cubrir contenido integral confirmado: metadata, resumen/KPIs, detalle/tendencia, desglose, evidencias aplicables y pie.
-- Mantener comportamiento degradado ante errores, datos vacíos o módulo no disponible.
+- Mantener comportamiento degradado ante errores, datos vacíos, cancelaciones o módulo no disponible.
 
 **Non-Goals:**
 - Implementar el backend de exportación en este repo; solo definir el contrato esperado y la integración UI.
-- Editor avanzado de plantillas PDF, branding configurable por usuario o programación/envío automático de PDFs.
+- Editor avanzado de plantillas PDF, branding configurable por usuario o envío automático por backend SMTP/WhatsApp Business.
 - Cambiar el significado de métricas existentes de reportes/analítica.
 
 ## Decisions
@@ -56,6 +57,13 @@ Restricciones relevantes:
 - **Rationale:** Son parte del valor integral, pero son la principal fuente de fragilidad.
 - **Enfoque:** convertir gráfico/timeline a representación compatible con la librería elegida; cargar evidencias imagen como datos renderizables cuando sea posible; adjuntos no imagen se listan como referencias. Si un asset falla, el PDF se genera con placeholder/aviso de asset no disponible.
 
+### D6: Compartición con Web Share API + fallback
+- **Decisión:** Usar `navigator.share`/`navigator.canShare` con archivo PDF cuando el navegador lo soporte; si no, usar fallbacks compatibles: `https://wa.me/?text=...` para WhatsApp y `mailto:?subject=...&body=...` para correo.
+- **Rationale:** `wa.me` y `mailto:` no adjuntan archivos de forma confiable entre navegadores/plataformas; Web Share API permite compartir el archivo generado en dispositivos compatibles. El fallback mantiene la acción disponible con expectativa clara.
+- **Alternativas:** envío por backend SMTP/WhatsApp Business (mayor alcance y control, pero agrega infraestructura, credenciales, privacidad y alcance fuera de este cambio); solo enlaces sin PDF (no cumple la necesidad de compartir el reporte).
+- **UX:** acciones “Compartir por WhatsApp” y “Compartir por correo” en corrida y analítica. El mensaje/asunto incluye tipo de reporte, perfil, fecha y resumen breve; no incluye datos sensibles innecesarios.
+- **Compatibilidad:** si no hay soporte de archivo, la UI genera/descarga el PDF y abre el fallback con aviso explícito de adjunto manual. Las cancelaciones del usuario se tratan como flujo no exitoso sin error bloqueante.
+
 ## Risks / Trade-offs
 
 - [Contrato backend inexistente] → Encapsular cliente/tipos de exportación y mostrar estado claro “exportación no disponible” hasta que el endpoint exista; coordinar contrato antes de cerrar implementación.
@@ -63,6 +71,9 @@ Restricciones relevantes:
 - [Evidencias pesadas o CORS] → Limitar/optimizar tamaño de imagen, manejar fallos por asset, considerar compresión; no bloquear todo el PDF por una imagen fallida.
 - [PDF grande/lento en navegador] → Generar con indicador de progreso, ejecutar composición fuera del hilo principal si la librería lo permite, y mantener secciones opcionales.
 - [Forma inconsistente de `byFile/timeline`] → Normalizar en payload backend; en frontend validar defensivamente y omitir sección con aviso si la forma es inválida.
+- [Soporte desigual de Web Share API] → Detectar `navigator.share/canShare`; usar fallback `wa.me`/`mailto` con aviso claro.
+- [Adjunto manual en fallback] → Informar explícitamente que el PDF se descargó o debe adjuntarse manualmente cuando el canal no soporte archivos.
+- [Privacidad en mensajes prellenados] → Incluir solo resumen mínimo (tipo, perfil, fecha, totales) y evitar datos sensibles innecesarios.
 
 ## Migration Plan
 
@@ -77,3 +88,5 @@ Restricciones relevantes:
 - Nombre final y forma exacta de los endpoints de exportación backend: ¿`/export` dedicado o query parameter sobre recursos existentes?
 - Política de adjuntos no imagen en PDF: ¿solo listar, o incluir enlace descargable cuando el visor lo soporte?
 - ¿El PDF analítico debe respetar filtros/rango de fechas si la UI los incorpora en el futuro? (por ahora no existen filtros explícitos en la vista actual).
+- ¿El correo debe limitarse a `mailto:`/Web Share en esta fase, o se espera envío por backend SMTP más adelante?
+- ¿WhatsApp debe ofrecer siempre opción directa `wa.me` además de Web Share cuando ambos estén disponibles?

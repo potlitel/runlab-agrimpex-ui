@@ -30,10 +30,17 @@
 - [x] 5.2 Aplicar gating de disponibilidad: ocultar/deshabilitar acciones PDF cuando el módulo `reports` no está disponible o el acceso es rechazado, reutilizando el comportamiento degradado existente; verificar con test UI/caso simulado de 403/feature deshabilitada.
 - [x] 5.3 Agregar cobertura de pruebas para los flujos críticos de exportación (éxito, error de payload, módulo no disponible, personalización) y verificar que la suite relevante pasa.
 
-## 6. Verificación e integración
+## 6. Compartición por WhatsApp y correo
 
-- [x] 6.1 Ejecutar `npm run lint`, pruebas relevantes y `npm run build`; verificar que finalizan sin errores.
-- [x] 6.2 Validar manualmente con backend/contrato disponible: exportación PDF por corrida desde detalle e historial, exportación analítica, personalización U3, evidencias y estados de error; verificar que los archivos descargados corresponden al contenido confirmado.
+- [x] 6.1 Implementar utilidades de compartición PDF (Web Share API con `files`, detección de soporte, fallbacks `wa.me` y `mailto:`, mensajes/asuntos prellenados) y verificar con pruebas unitarias que elige el flujo correcto por capacidad del navegador.
+- [x] 6.2 Integrar acciones “Compartir por WhatsApp” y “Compartir por correo” en corrida (detalle/historial) y analítica, reutilizando la generación PDF existente; verificar manualmente o con test UI que las acciones generan el PDF y abren el flujo esperado.
+- [x] 6.3 Manejar cancelación, errores y fallback de adjunto manual con mensajes claros; verificar con pruebas/casos simulados que la UI no queda en estado inconsistente.
+
+## 7. Verificación e integración
+
+- [x] 7.1 Ejecutar `npm run lint`, pruebas relevantes y `npm run build`; verificar que finalizan sin errores.
+- [x] 7.2 Validar manualmente con backend/contrato disponible: exportación PDF por corrida desde detalle e historial, exportación analítica, personalización U3, evidencias y estados de error; verificar que los archivos descargados corresponden al contenido confirmado.
+- [ ] 7.3 Validar compartición por WhatsApp/correo en navegador compatible con Web Share y en fallback `wa.me`/`mailto:`; verificar mensajes prellenados, manejo de adjunto manual y ausencia de errores bloqueantes.
 
 ## Workflow follow-up
 

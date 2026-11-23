@@ -99,12 +99,12 @@ function normalizeAnalyticsPayload(
   }
 }
 
-export async function exportRunPdf(args: {
+export async function buildRunPdfBlob(args: {
   reportId: string
   profileName?: string
   sections?: RunExportSection[]
   fallbackReport?: ReportDetail | ReportListItem | null
-}): Promise<void> {
+}): Promise<{ blob: Blob; fileName: string; payload: ReportRunExportPayload }> {
   let payload: unknown
   try {
     payload = await reportsApi.exportRun(args.reportId)
@@ -126,15 +126,15 @@ export async function exportRunPdf(args: {
   })
   const blob = await generateRunPdf(normalized, { sections: args.sections })
   const safeId = args.reportId.replace(/[^a-zA-Z0-9._-]+/g, '-')
-  downloadBlob(blob, `reporte-${safeId}.pdf`)
+  return { blob, fileName: `reporte-${safeId}.pdf`, payload: normalized }
 }
 
-export async function exportAnalyticsPdf(args: {
+export async function buildAnalyticsPdfBlob(args: {
   profileName?: string
   sections?: AnalyticsExportSection[]
   fallbackAnalytics?: ReportsAnalytics | null
   fallbackRecentRuns?: ReportListItem[]
-}): Promise<void> {
+}): Promise<{ blob: Blob; fileName: string; payload: ReportAnalyticsExportPayload }> {
   let payload: unknown
   try {
     payload = await reportsApi.exportAnalytics()
@@ -155,7 +155,27 @@ export async function exportAnalyticsPdf(args: {
   })
   const blob = await generateAnalyticsPdf(normalized, { sections: args.sections })
   const date = new Date().toISOString().slice(0, 10)
-  downloadBlob(blob, `reporte-analitico-${date}.pdf`)
+  return { blob, fileName: `reporte-analitico-${date}.pdf`, payload: normalized }
+}
+
+export async function exportRunPdf(args: {
+  reportId: string
+  profileName?: string
+  sections?: RunExportSection[]
+  fallbackReport?: ReportDetail | ReportListItem | null
+}): Promise<void> {
+  const { blob, fileName } = await buildRunPdfBlob(args)
+  downloadBlob(blob, fileName)
+}
+
+export async function exportAnalyticsPdf(args: {
+  profileName?: string
+  sections?: AnalyticsExportSection[]
+  fallbackAnalytics?: ReportsAnalytics | null
+  fallbackRecentRuns?: ReportListItem[]
+}): Promise<void> {
+  const { blob, fileName } = await buildAnalyticsPdfBlob(args)
+  downloadBlob(blob, fileName)
 }
 
 export { RUN_PDF_SECTIONS, ANALYTICS_PDF_SECTIONS }

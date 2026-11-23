@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, ExternalLink, FileDown, ImageIcon, SlidersHorizontal } from 'lucide-react'
+import { Download, ExternalLink, FileDown, ImageIcon, Mail, MessageCircle, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { reportsApi } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/table'
 import type { ReportAttachment, ReportDetail, ReportListItem } from '@/types/contract'
 import { RUN_PDF_SECTIONS, exportRunPdf, type RunExportSection } from '../pdf/export-reports'
+import { shareRunPdf, type ShareChannel } from '../pdf/share-reports'
 import { ExportPdfDialog } from './export-pdf-dialog'
 
 type ReportDetailSheetProps = {
@@ -65,6 +66,7 @@ export function ReportDetailSheet({
   onOpenChange,
 }: ReportDetailSheetProps) {
   const [exporting, setExporting] = useState(false)
+  const [sharingChannel, setSharingChannel] = useState<ShareChannel | null>(null)
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const reportId = report?.id ?? detail?.id ?? null
   const summary = detail?.summary ?? report?.summary
@@ -85,6 +87,32 @@ export function ReportDetailSheet({
       toast.error(e instanceof Error ? e.message : 'No se pudo generar el PDF')
     } finally {
       setExporting(false)
+    }
+  }
+
+  const handleShare = async (channel: ShareChannel) => {
+    if (!reportId) return
+    setSharingChannel(channel)
+    try {
+      const result = await shareRunPdf({
+        channel,
+        reportId,
+        profileName,
+        fallbackReport: detail ?? report,
+      })
+      if (result.status === 'shared') {
+        toast.success(channel === 'whatsapp' ? 'Reporte compartido por WhatsApp' : 'Reporte compartido por correo')
+      } else if (result.status === 'fallback') {
+        toast.info(
+          channel === 'whatsapp'
+            ? 'Se abrió WhatsApp con mensaje prellenado. Adjunta el PDF descargado si es necesario.'
+            : 'Se abrió el correo con asunto y mensaje prellenado. Adjunta el PDF descargado.'
+        )
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo compartir el PDF')
+    } finally {
+      setSharingChannel(null)
     }
   }
 
@@ -118,7 +146,7 @@ export function ReportDetailSheet({
                   variant='default'
                   size='sm'
                   onClick={() => void handleExport()}
-                  disabled={exporting}
+                  disabled={exporting || sharingChannel !== null}
                 >
                   <FileDown className='size-4' /> {exporting ? 'Generando…' : 'Exportar PDF'}
                 </Button>
@@ -126,9 +154,25 @@ export function ReportDetailSheet({
                   variant='outline'
                   size='sm'
                   onClick={() => setCustomizeOpen(true)}
-                  disabled={exporting}
+                  disabled={exporting || sharingChannel !== null}
                 >
                   <SlidersHorizontal className='size-4' /> Personalizar PDF…
+                </Button>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => void handleShare('whatsapp')}
+                  disabled={exporting || sharingChannel !== null}
+                >
+                  <MessageCircle className='size-4' /> {sharingChannel === 'whatsapp' ? 'Compartiendo…' : 'WhatsApp'}
+                </Button>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={() => void handleShare('email')}
+                  disabled={exporting || sharingChannel !== null}
+                >
+                  <Mail className='size-4' /> {sharingChannel === 'email' ? 'Compartiendo…' : 'Correo'}
                 </Button>
                 <Button variant='outline' size='sm' asChild>
                   <a href={reportsApi.downloadJsonUrl(reportId)} target='_blank' rel='noreferrer'>

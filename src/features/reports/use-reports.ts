@@ -83,9 +83,11 @@ export function useReports() {
       ? messageOf(detailQuery.error, 'No se pudo cargar el detalle del reporte')
       : null,
 
-    refresh: () => {
-      void queryClient.invalidateQueries({ queryKey: ['reports'] })
-      void featuresQuery.refetch()
+    refresh: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['reports', activeProfileId] }),
+        featuresQuery.refetch(),
+      ])
     },
   }
 }

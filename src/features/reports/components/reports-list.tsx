@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Copy, Eye, FileDown, ImageIcon, SlidersHorizontal } from 'lucide-react'
+import { Copy, Eye, FileDown, ImageIcon, Mail, MessageCircle, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { reportsApi } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/table'
 import type { ReportListItem } from '@/types/contract'
 import { RUN_PDF_SECTIONS, exportRunPdf, type RunExportSection } from '../pdf/export-reports'
+import { shareRunPdf, type ShareChannel } from '../pdf/share-reports'
 import { ExportPdfDialog } from './export-pdf-dialog'
 
 type ReportsListProps = {
@@ -92,6 +93,7 @@ export function ReportsList({
   onSelect,
 }: ReportsListProps) {
   const [exportingId, setExportingId] = useState<string | null>(null)
+  const [sharing, setSharing] = useState<{ id: string; channel: ShareChannel } | null>(null)
   const [customizeReport, setCustomizeReport] = useState<ReportListItem | null>(null)
 
   const handleDirectExport = async (report: ReportListItem) => {
@@ -107,6 +109,31 @@ export function ReportsList({
       toast.error(e instanceof Error ? e.message : 'No se pudo generar el PDF')
     } finally {
       setExportingId(null)
+    }
+  }
+
+  const handleShare = async (report: ReportListItem, channel: ShareChannel) => {
+    setSharing({ id: report.id, channel })
+    try {
+      const result = await shareRunPdf({
+        channel,
+        reportId: report.id,
+        profileName,
+        fallbackReport: report,
+      })
+      if (result.status === 'shared') {
+        toast.success(channel === 'whatsapp' ? 'Reporte compartido por WhatsApp' : 'Reporte compartido por correo')
+      } else if (result.status === 'fallback') {
+        toast.info(
+          channel === 'whatsapp'
+            ? 'Se abrió WhatsApp con mensaje prellenado. Adjunta el PDF descargado si es necesario.'
+            : 'Se abrió el correo con asunto y mensaje prellenado. Adjunta el PDF descargado.'
+        )
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo compartir el PDF')
+    } finally {
+      setSharing(null)
     }
   }
 
@@ -152,7 +179,7 @@ export function ReportsList({
               {reports.map((report) => {
                 const failed = (report.summary.failed ?? 0) + (report.summary.errors ?? 0)
                 const preview = report.summary.previewImage
-                const exporting = exportingId === report.id
+                const busy = exportingId === report.id || sharing?.id === report.id
                 return (
                   <TableRow key={report.id} className='group/row'>
                     <TableCell className='ps-6 py-3'>
@@ -198,9 +225,9 @@ export function ReportsList({
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size='sm' variant='outline' disabled={exporting}>
+                            <Button size='sm' variant='outline' disabled={busy}>
                               <FileDown className='size-4' />
-                              {exporting ? 'Generando…' : 'PDF'}
+                              {busy ? '…' : 'PDF'}
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align='end'>
@@ -209,6 +236,12 @@ export function ReportsList({
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setCustomizeReport(report)}>
                               <SlidersHorizontal className='size-4' /> Personalizar PDF…
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void handleShare(report, 'whatsapp')}>
+                              <MessageCircle className='size-4' /> Compartir por WhatsApp
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => void handleShare(report, 'email')}>
+                              <Mail className='size-4' /> Compartir por correo
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

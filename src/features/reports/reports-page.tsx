@@ -1,8 +1,23 @@
 import { useState } from 'react'
-import { BarChart3, FileDown, RefreshCw, SlidersHorizontal } from 'lucide-react'
+import {
+  BarChart3,
+  FileDown,
+  Mail,
+  MessageCircle,
+  RefreshCw,
+  Share2,
+  SlidersHorizontal,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
@@ -13,6 +28,7 @@ import { ExportPdfDialog } from './components/export-pdf-dialog'
 import { ReportDetailSheet } from './components/report-detail-sheet'
 import { ReportsList } from './components/reports-list'
 import { ANALYTICS_PDF_SECTIONS, exportAnalyticsPdf, type AnalyticsExportSection } from './pdf/export-reports'
+import { shareAnalyticsPdf, type ShareChannel } from './pdf/share-reports'
 import { useReports } from './use-reports'
 
 export function ReportsPage() {
@@ -32,7 +48,9 @@ export function ReportsPage() {
 function ReportsPageView({ profileName }: { profileName?: string }) {
   const reports = useReports()
   const [exportingAnalytics, setExportingAnalytics] = useState(false)
+  const [sharingAnalyticsChannel, setSharingAnalyticsChannel] = useState<ShareChannel | null>(null)
   const [customizeAnalyticsOpen, setCustomizeAnalyticsOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const selectedReport =
     reports.selectedId != null
@@ -41,6 +59,7 @@ function ReportsPageView({ profileName }: { profileName?: string }) {
 
   const canExportAnalytics =
     !reports.unavailable && !!reports.analytics && reports.analytics.totalRuns > 0
+  const analyticsBusy = exportingAnalytics || sharingAnalyticsChannel !== null
 
   const handleAnalyticsExport = async (sections?: AnalyticsExportSection[]) => {
     setExportingAnalytics(true)
@@ -56,6 +75,40 @@ function ReportsPageView({ profileName }: { profileName?: string }) {
       toast.error(e instanceof Error ? e.message : 'No se pudo generar el PDF analítico')
     } finally {
       setExportingAnalytics(false)
+    }
+  }
+
+  const handleAnalyticsShare = async (channel: ShareChannel) => {
+    setSharingAnalyticsChannel(channel)
+    try {
+      const result = await shareAnalyticsPdf({
+        channel,
+        profileName,
+        fallbackAnalytics: reports.analytics,
+        fallbackRecentRuns: reports.reports,
+      })
+      if (result.status === 'shared') {
+        toast.success(channel === 'whatsapp' ? 'Reporte analítico compartido por WhatsApp' : 'Reporte analítico compartido por correo')
+      } else if (result.status === 'fallback') {
+        toast.info(
+          channel === 'whatsapp'
+            ? 'Se abrió WhatsApp con mensaje prellenado. Adjunta el PDF descargado si es necesario.'
+            : 'Se abrió el correo con asunto y mensaje prellenado. Adjunta el PDF descargado.'
+        )
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo compartir el PDF analítico')
+    } finally {
+      setSharingAnalyticsChannel(null)
+    }
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await reports.refresh()
+    } finally {
+      setRefreshing(false)
     }
   }
 
@@ -76,41 +129,80 @@ function ReportsPageView({ profileName }: { profileName?: string }) {
             <ProfileHeaderBadge profileName={profileName} />
             {!reports.unavailable && (
               <>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  onClick={() => void handleAnalyticsExport()}
-                  disabled={!canExportAnalytics || exportingAnalytics}
-                >
-                  <FileDown className='size-4' />
-                  {exportingAnalytics ? 'Generando…' : 'Exportar PDF analítico'}
-                </Button>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  onClick={() => setCustomizeAnalyticsOpen(true)}
-                  disabled={!canExportAnalytics || exportingAnalytics}
-                >
-                  <SlidersHorizontal className='size-4' />
-                  Personalizar PDF…
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      disabled={!canExportAnalytics || analyticsBusy}
+                      aria-label='Exportar o compartir'
+                    >
+                      <Share2 className='size-4' />
+                      <span className='hidden sm:inline'>Exportar / Compartir</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align='end'>
+                    <DropdownMenuItem
+                      onClick={() => void handleAnalyticsExport()}
+                      disabled={!canExportAnalytics || analyticsBusy}
+                    >
+                      <FileDown className='size-4' />
+                      {exportingAnalytics ? 'Generando PDF…' : 'Exportar PDF'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => void handleAnalyticsShare('whatsapp')}
+                      disabled={!canExportAnalytics || analyticsBusy}
+                    >
+                      <MessageCircle className='size-4' />
+                      {sharingAnalyticsChannel === 'whatsapp' ? 'Compartiendo…' : 'WhatsApp'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => void handleAnalyticsShare('email')}
+                      disabled={!canExportAnalytics || analyticsBusy}
+                    >
+                      <Mail className='size-4' />
+                      {sharingAnalyticsChannel === 'email' ? 'Compartiendo…' : 'Correo'}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size='icon'
+                      variant='outline'
+                      onClick={() => setCustomizeAnalyticsOpen(true)}
+                      disabled={!canExportAnalytics || analyticsBusy}
+                      aria-label='Personalizar PDF'
+                    >
+                      <SlidersHorizontal className='size-4' />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Personalizar PDF</TooltipContent>
+                </Tooltip>
               </>
             )}
-            <Button
-              size='sm'
-              variant='outline'
-              onClick={reports.refresh}
-              disabled={reports.listLoading || reports.analyticsLoading}
-            >
-              <RefreshCw
-                className={
-                  reports.listLoading || reports.analyticsLoading
-                    ? 'size-4 animate-spin'
-                    : 'size-4'
-                }
-              />
-              Actualizar
-            </Button>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size='icon'
+                  variant='outline'
+                  onClick={() => void handleRefresh()}
+                  disabled={refreshing || reports.listLoading || reports.analyticsLoading}
+                  aria-label='Actualizar'
+                >
+                  <RefreshCw
+                    className={
+                      refreshing || reports.listLoading || reports.analyticsLoading
+                        ? 'size-4 animate-spin'
+                        : 'size-4'
+                    }
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Actualizar</TooltipContent>
+            </Tooltip>
             <HeaderTools />
           </div>
         </div>

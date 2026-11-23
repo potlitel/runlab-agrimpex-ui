@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Permitir la generación y descarga de reportes PDF integrales, tanto por corrida individual como analíticos agregados, para compartir y archivar resultados de QA con un contenido completo y consistente.
+Permitir la generación, descarga y compartición de reportes PDF integrales, tanto por corrida individual como analíticos agregados, para distribuir y archivar resultados de QA con un contenido completo y consistente.
 
 ## ADDED Requirements
 
@@ -57,3 +57,26 @@ La UI SHALL manejar errores de obtención de payload, generación de PDF y dispo
 #### Scenario: Módulo de reportes no disponible
 - **WHEN** el módulo de reportes no está habilitado o la API rechaza el acceso
 - **THEN** la UI no ofrece acciones de exportación PDF activas y mantiene el comportamiento degradado existente del módulo
+
+### Requirement: Compartición de reportes PDF
+La UI SHALL permitir compartir un reporte PDF generado por corrida o analítico mediante WhatsApp y correo electrónico, usando capacidades del navegador cuando estén disponibles y alternativas compatibles cuando no lo estén.
+
+#### Scenario: Compartir por WhatsApp con soporte de archivo
+- **WHEN** el usuario solicita compartir por WhatsApp y el navegador soporta compartir archivos
+- **THEN** la UI genera el PDF y abre el flujo de compartición con el archivo y un mensaje descriptivo
+
+#### Scenario: Compartir por WhatsApp sin soporte de archivo
+- **WHEN** el usuario solicita compartir por WhatsApp y el navegador no soporta compartir archivos
+- **THEN** la UI genera/descarga el PDF según corresponda y abre una alternativa compatible con mensaje prellenado, informando que el adjunto debe agregarse manualmente si aplica
+
+#### Scenario: Compartir por correo electrónico con soporte de archivo
+- **WHEN** el usuario solicita compartir por correo electrónico y el navegador soporta compartir archivos
+- **THEN** la UI genera el PDF y abre el flujo de compartición con el archivo, asunto y cuerpo descriptivo
+
+#### Scenario: Compartir por correo electrónico sin soporte de archivo
+- **WHEN** el usuario solicita compartir por correo electrónico y el navegador no soporta compartir archivos
+- **THEN** la UI abre un `mailto:` con asunto y cuerpo prellenado y genera/descarga el PDF para adjuntarlo manualmente, informando claramente la acción requerida
+
+#### Scenario: Error o cancelación en compartición
+- **WHEN** falla la generación del PDF o el usuario cancela el flujo de compartición
+- **THEN** la UI muestra un estado comprensible, no pierde el contexto actual y no deja la exportación en estado inconsistente

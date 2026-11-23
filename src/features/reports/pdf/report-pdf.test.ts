@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { ReportAnalyticsExportPayload } from '@/types/contract'
 import {
   ANALYTICS_PDF_SECTIONS,
   RUN_PDF_SECTIONS,
@@ -124,9 +125,9 @@ describe('report-pdf', () => {
         byFile: [],
         timeline: [],
       },
-      timeline: [null, { timestamp: 'bad-date', passed: '2', failed: undefined }] as any,
-      byFile: [null, { name: 'x.spec.ts', total: '3', passed: 2, failed: 1 }] as any,
-      recentRuns: [null, { id: 'r1', summary: { total: 3, passed: 2, failed: 1 } }] as any,
+      timeline: [null, { timestamp: 'bad-date', passed: '2', failed: undefined }] as unknown as ReportAnalyticsExportPayload['timeline'],
+      byFile: [null, { name: 'x.spec.ts', total: '3', passed: 2, failed: 1 }] as unknown as ReportAnalyticsExportPayload['byFile'],
+      recentRuns: [null, { id: 'r1', summary: { total: 3, passed: 2, failed: 1 } }] as unknown as ReportAnalyticsExportPayload['recentRuns'],
     })
     expect(blob.size).toBeGreaterThan(1000)
   })
