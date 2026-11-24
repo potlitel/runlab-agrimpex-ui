@@ -15,7 +15,7 @@ const HISTORY_LIMIT = 20
  * Estado del backend para la badge del header. Es informativo: sus errores no
  * se propagan ni condicionan las queries de las vistas de features.
  */
-export function useHealth() {
+export function useHealth(options: { warmup?: boolean } = {}) {
   const query = useQuery<HealthDetail>({
     queryKey: ['health', 'detail'],
     queryFn: () => systemApi.healthDetail(),
@@ -26,6 +26,7 @@ export function useHealth() {
 
   const [history, setHistory] = useState<HealthHistoryPoint[]>([])
   const lastRecordedAt = useRef(0)
+  const warmedUp = useRef(false)
 
   // El historial se deriva de las respuestas ya recibidas; no es un endpoint
   // nuevo ni un sondeo adicional. Cada actualización aporta un único punto.
@@ -44,6 +45,16 @@ export function useHealth() {
     }
     setHistory((previous) => [...previous, point].slice(-HISTORY_LIMIT))
   }, [query.data, query.dataUpdatedAt])
+
+  // La vista de salud necesita dos muestras para dibujar la tendencia. Sin
+  // cambiar el sondeo de 30 s, se fuerza una segunda lectura al abrirla para
+  // que el gráfico aparezca de inmediato.
+  useEffect(() => {
+    if (!options.warmup || warmedUp.current || query.isFetching) return
+    if (!query.dataUpdatedAt || history.length >= 2) return
+    warmedUp.current = true
+    void query.refetch()
+  }, [options.warmup, query.dataUpdatedAt, query.isFetching, query.refetch, history.length])
 
   const status: HealthBadgeStatus = query.error
     ? 'offline'

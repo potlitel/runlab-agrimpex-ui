@@ -149,7 +149,7 @@ export function HealthPage() {
     history,
     healthPercentage,
     refresh,
-  } = useHealth()
+  } = useHealth({ warmup: true })
   const label = STATUS_LABELS[status]
 
   // Un único reloj de UI para textos relativos y cuenta regresiva; el sondeo

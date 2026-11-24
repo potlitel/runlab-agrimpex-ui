@@ -70,6 +70,22 @@ describe('useHealth', () => {
     await waitFor(() => expect(result.current.history).toHaveLength(2))
   })
 
+  it('hace un warm-up inmediato cuando la vista lo pide', async () => {
+    healthDetail.mockResolvedValue({
+      status: 'ok',
+      uptimeSeconds: 8,
+      checks: { critical: [{ id: 'profiles', status: 'ok' }], informational: [] },
+      failedChecks: [],
+    })
+    const { useHealth } = await import('./use-health')
+    const { result } = renderHook(() => useHealth({ warmup: true }), {
+      wrapper: makeWrapper(),
+    })
+
+    await waitFor(() => expect(result.current.history).toHaveLength(2))
+    expect(healthDetail).toHaveBeenCalledTimes(2)
+  })
+
   it('un error no lanza excepción ni bloquea otras queries', async () => {
     healthDetail.mockRejectedValue(new Error('API inalcanzable'))
     const otherQuery = vi.fn().mockResolvedValue({ ok: true })
