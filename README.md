@@ -202,6 +202,18 @@ docker run -d --name runlabqa-ui -p 3002:3000 runlabqa-agrimpex-ui
 
 Ver [guía completa de onboarding Docker](docs/ONBOARDING_DOCKER.md).
 
+### 6) Publicar cambios de código: rebuild + recreate
+
+Cuando cambia el código (no solo `.env`), reconstruye las imágenes y fuerza el recreado de los contenedores para que usen los nuevos layers:
+
+```bash
+docker compose build runlabqa-api runlabqa-ui
+docker compose up -d --force-recreate runlabqa-api runlabqa-ui
+docker compose ps
+```
+
+`docker compose restart runlabqa-ui` solo reinicia el proceso con la imagen que ya tenía: no incorpora un bundle nuevo ni garantiza que un contenedor existente se vuelva a crear. Tras el recreate, la API debe quedar `healthy` y la UI responder en `http://localhost:3002`.
+
 ---
 
 ## Docker Compose: referencia detallada
