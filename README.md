@@ -16,6 +16,7 @@ Frontend del dashboard QA **RunLab Agrimpex** para gestionar perfiles, configura
 - [Vistas principales](#vistas-principales)
 - [Configuración del proyecto y `playwrightCmd`](#configuración-del-proyecto-y-playwrightcmd)
 - [Evidencia gráfica: defaults, nombres y rollback](#evidencia-gráfica-defaults-nombres-y-rollback)
+- [Estado del backend y badge de salud](#estado-del-backend-y-badge-de-salud)
 
 ## Arquitectura
 
@@ -129,7 +130,7 @@ docker compose ps
 
 | Servicio | Contenedor | URL desde el host | Observaciones |
 |---|---|---|---|
-| `runlabqa-api` | `runlabqa-api` | <http://localhost:3001> · `/api/docs/` | Healthcheck en `/api/openapi.json`; datos en volumen `runlabqa-data` |
+| `runlabqa-api` | `runlabqa-api` | <http://localhost:3001> · `/api/docs/` | Healthcheck en `/api/health`; datos en volumen `runlabqa-data` |
 | `runlabqa-ui` | `runlabqa-ui` | <http://localhost:3002> | Espera a que la API esté `healthy`; sirve `dist` en `:3000` dentro del contenedor |
 
 > ⚠️ `http://localhost:3000` es el stack DAM de referencia (`dam-frontend`), no este dashboard. Usa **`3002`**. Si necesitas sí o sí el `3000`, detén `dam-frontend` y pon `UI_PORT=3000` en `.env`.
@@ -141,7 +142,8 @@ La UI se construye con `Dockerfile.npm` (multi-stage, patrón del repo `DeviceAc
 ### 2) Verificación
 
 ```bash
-curl -i http://localhost:3001/api/openapi.json     # 200
+curl -i http://localhost:3001/api/health           # 200 (healthcheck)
+curl -i http://localhost:3001/api/health/detail    # 200 o 503 según checks críticos
 curl -i http://localhost:3002/                     # 200
 docker compose logs -f runlabqa-ui
 ```
@@ -218,7 +220,7 @@ El stack se define en **`docker-compose.yml`**, en este mismo repo, junto con `.
 | `container_name` | `runlabqa-ui`. |
 | `restart` | `unless-stopped`. |
 | `ports` | `"${UI_PORT:-3002}:3000"`. Contenedor escucha `3000`; host publica `3002` porque `3000` es DAM. |
-| `depends_on` | `runlabqa-api` con `condition: service_healthy` → la UI espera a `GET /api/openapi.json`. |
+| `depends_on` | `runlabqa-api` con `condition: service_healthy` → la UI espera a `GET /api/health`. |
 | `networks` | `runlabqa-network` (bridge privada con la API). |
 | `volumes` | Ninguno: el bundle es estático y se reconstruye cuando cambian las URLs. |
 
@@ -317,6 +319,45 @@ Las páginas principales mantienen herramientas de navegación/utilidad en el he
 - **Ajustes visuales (rueda dentada)**: tema, layout, sidebar y dirección.
 
 Además, el sidebar incluye el selector de perfil activo y la navegación por secciones.
+
+## Estado del backend y badge de salud
+
+El header muestra una badge informativa del backend junto al cambio de tema. No es una pantalla de carga ni una compuerta: las vistas, las queries y la ejecución siguen disponibles aunque el estado sea `degraded` u `offline`.
+
+### Contrato consumido
+
+| Cliente | Endpoint | Uso |
+|---|---|---|
+| `systemApi.health()` | `GET /api/health` | Liveness barata usada por Docker; sin `X-Profile-Id` ni filesystem. |
+| `systemApi.healthDetail()` | `GET /api/health/detail` | Readiness que alimenta la badge; usa el perfil activo. |
+
+`useHealth` consulta `healthDetail()` con React Query bajo la key `['health', 'detail']`, con `refetchInterval` de **30 s**, `staleTime` de 10 s y `retry: 1`. El intervalo es el mismo que el del healthcheck del contenedor para que la badge refleje el estado real sin sondeos costosos. Un error de red se convierte en `offline`: nunca se lanza a los componentes ni bloquea otras queries.
+
+### Estados
+
+`HealthStatus` en `src/types/contract.ts` define los estados devueltos por la API; `HealthBadgeStatus` añade `offline` para el caso en que la UI no pueda contactar al backend.
+
+| Estado API | Código HTTP | Etiqueta de la badge | Significado |
+|---|---|---|---|
+| `ok` | `200` | `OK` | Checks críticos e informativos sin fallos. |
+| `degraded` | `200` | `Degradado` | Falló al menos un check informativo; se listan sus ids en `failedChecks`. |
+| `unhealthy` | `503` | `Sin conexión` | Falló un check crítico (perfiles, reportes o galería configurada). |
+| `offline` | — | `Sin conexión` | La UI no obtuvo respuesta de `/api/health/detail`; no forma parte de `HealthStatus`. |
+
+`failedChecks` contiene identificadores estables (`profiles`, `reports`, `evidenceGallery`, `profile`, `projectPath`, `playwrightKit`, `scheduler`, `socket`, `dockerGrid`). El estado `not_configured` no cuenta como fallo. La respuesta de salud no incluye rutas, tokens ni valores de entorno; por eso la badge solo muestra los ids y un mensaje genérico.
+
+Cuando el estado no es `ok`, aparece el botón de reintento: llama a `refresh()` y vuelve a consultar `/api/health/detail` sin recargar la página ni reiniciar otras vistas.
+
+### Rollback
+
+Para retirar solo el indicador, elimina el import y el elemento `<HealthStatusBadge />` de `src/components/layout/header-tools.tsx`. Opcionalmente se pueden borrar `src/components/health-status-badge.tsx`, `src/hooks/use-health.ts`, sus tests y los tipos/métodos `Health*` y `systemApi.health*`. Los endpoints del API y el `HEALTHCHECK` de Docker son independientes: pueden permanecer activos sin afectar a perfiles, reportes ni assets. No hay migración de datos.
+
+Verificación puntual tras el cambio:
+
+```bash
+npx tsc -b --pretty false
+npx vitest run src/lib/api.health.test.ts src/hooks/use-health.test.tsx src/components/health-status-badge.test.tsx
+```
 
 ## Tests: proyecto visible y visor de archivos
 

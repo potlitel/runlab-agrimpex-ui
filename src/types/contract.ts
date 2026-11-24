@@ -572,6 +572,33 @@ export interface SystemUpdate {
   [key: string]: unknown
 }
 
+// ── Health / readiness ────────────────────────────────────────────────────
+export type HealthStatus = 'ok' | 'degraded' | 'unhealthy'
+export type HealthBadgeStatus = HealthStatus | 'offline'
+export type HealthCheckStatus = HealthStatus | 'not_configured'
+
+export interface HealthCheck {
+  id: string
+  status: HealthCheckStatus
+  message?: string
+}
+
+export interface HealthLiveness {
+  status: 'ok'
+  uptimeSeconds: number
+  version: string
+}
+
+export interface HealthDetail {
+  status: HealthStatus
+  uptimeSeconds: number
+  checks: {
+    critical: HealthCheck[]
+    informational: HealthCheck[]
+  }
+  failedChecks: string[]
+}
+
 // ── Payloads Socket.io (todos con profileId salvo profiles:status global) ─
 export interface SocketProfilePayload {
   profileId: string

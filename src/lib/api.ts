@@ -23,6 +23,8 @@ import {
   type EnvVar,
   type ErrorImagesResponse,
   type FeatureFlags,
+  type HealthDetail,
+  type HealthLiveness,
   type JsonDataFileResponse,
   type JsonDataTreeResponse,
   type Profile,
@@ -299,6 +301,8 @@ export const profileAdminApi = {
 export const systemApi = {
   get: () => get<SystemUpdate>('/system/updates'),
   updates: () => get<SystemUpdate>('/system/updates'),
+  health: () => get<HealthLiveness>('/health'),
+  healthDetail: () => get<HealthDetail>('/health/detail'),
   update: (token?: string) =>
     api.post<SystemUpdate, SystemUpdate>(
       '/system/update',
