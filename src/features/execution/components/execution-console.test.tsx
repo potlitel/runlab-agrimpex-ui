@@ -1,6 +1,13 @@
+import type { ReactNode } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { ExecutionConsole } from './execution-console'
+
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ to, children }: { to: string; children: ReactNode }) => (
+    <a href={to}>{children}</a>
+  ),
+}))
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn()
@@ -32,6 +39,19 @@ describe('ExecutionConsole', () => {
     expect(screen.getByText('67%')).toBeTruthy()
     expect(screen.getByText('12.5s')).toBeTruthy()
     expect(screen.getByText('Resumen parcial')).toBeTruthy()
+    expect(screen.getByText('Consola en espera')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Sin actividad reciente. Inicia una corrida para ver el progreso.'
+      )
+    ).toBeTruthy()
+    const startRun = screen.getByRole('link', { name: 'Iniciar Corrida' })
+    expect(startRun.getAttribute('href')).toBe('/tests')
+    expect(startRun.querySelector('svg')).not.toBeNull()
+    expect(startRun.parentElement?.className).toContain('text-foreground')
+    const log = screen.getByRole('log', { name: 'Salida de la ejecución' })
+    expect(log.getAttribute('aria-live')).toBe('polite')
+    expect(log.className).toContain('bg-zinc-950')
   })
 
   it('no muestra cifras de éxito sin resumen final', () => {
@@ -53,7 +73,14 @@ describe('ExecutionConsole', () => {
     const onClear = vi.fn()
     render(
       <ExecutionConsole
-        logs={[{ id: '1', at: '2026-11-23T10:00:00.000Z', kind: 'info', text: 'evento reciente' }]}
+        logs={[
+          {
+            id: '1',
+            at: '2026-11-23T10:00:00.000Z',
+            kind: 'info',
+            text: 'evento reciente',
+          },
+        ]}
         progress={{ current: 2, total: 4, percentage: 50 }}
         running
         summary={null}
@@ -65,7 +92,9 @@ describe('ExecutionConsole', () => {
     expect(log.getAttribute('aria-live')).toBe('polite')
     expect(screen.getByText('evento reciente')).toBeTruthy()
 
-    const progress = screen.getByRole('progressbar', { name: 'Progreso de la ejecución' })
+    const progress = screen.getByRole('progressbar', {
+      name: 'Progreso de la ejecución',
+    })
     expect(progress.getAttribute('aria-valuenow')).toBe('50')
     expect(progress.getAttribute('aria-valuetext')).toBe('2 de 4 tests, 50%')
 

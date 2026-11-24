@@ -1,10 +1,36 @@
 import { useState, type ReactNode } from 'react'
-import { AlertCircle, ChevronDown, ChevronRight, Image as ImageIcon, Loader2, Paperclip, RefreshCw, Search } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import type { EvidenceItem, EvidenceKind } from '@/types/contract'
+import {
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  FilterX,
+  FolderTree,
+  Image as ImageIcon,
+  Loader2,
+  Paperclip,
+  PlayCircle,
+  RefreshCw,
+  Search,
+} from 'lucide-react'
 import { reportsApi } from '@/lib/api'
+import {
+  normalizeCaptureOrigin,
+  normalizeEvidenceMetadata,
+  normalizeEvidenceStatus,
+} from '@/lib/evidence'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -15,17 +41,12 @@ import {
 } from '@/components/ui/table'
 import { EvidenceDialog } from '@/features/errors/components/evidence-viewer'
 import {
-  normalizeCaptureOrigin,
-  normalizeEvidenceMetadata,
-  normalizeEvidenceStatus,
-} from '@/lib/evidence'
-import type { EvidenceItem, EvidenceKind } from '@/types/contract'
-import type { ExecutionTestResult } from '../use-execution'
-import {
   selectResultGroups,
   type ResultSort,
   type ResultStatusFilter,
 } from '../results-view'
+import type { ExecutionTestResult } from '../use-execution'
+import { ExecutionEmptyState } from './execution-empty-state'
 
 type ResultsTableProps = {
   results: Record<string, ExecutionTestResult>
@@ -55,8 +76,10 @@ function attachmentKind(attachment: Record<string, unknown>): EvidenceKind {
   const name = String(
     attachment.name ?? attachment.path ?? attachment.assetPath ?? ''
   ).toLowerCase()
-  if (contentType.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/.test(name)) return 'image'
-  if (contentType.startsWith('video/') || /\.(mp4|webm)$/.test(name)) return 'video'
+  if (contentType.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/.test(name))
+    return 'image'
+  if (contentType.startsWith('video/') || /\.(mp4|webm)$/.test(name))
+    return 'video'
   if (name.includes('trace') || name.endsWith('.zip')) return 'trace'
   if (name.includes('context') || name.endsWith('.json')) return 'context'
   return 'other'
@@ -74,14 +97,13 @@ function toEvidenceItem(
         ? attachment.path
         : ''
   const directUrl = typeof attachment.url === 'string' ? attachment.url : ''
-  const url = assetPath && reportId ? reportsApi.assetUrl(reportId, assetPath) : directUrl
+  const url =
+    assetPath && reportId ? reportsApi.assetUrl(reportId, assetPath) : directUrl
   if (!url) return null
 
   const name = String(attachment.name ?? assetPath ?? 'adjunto')
   const captureName =
-    typeof attachment.captureName === 'string'
-      ? attachment.captureName
-      : name
+    typeof attachment.captureName === 'string' ? attachment.captureName : name
   return normalizeEvidenceMetadata({
     id: `${result.id}:${assetPath || name}`,
     name,
@@ -131,21 +153,40 @@ function AttachmentThumbnail({
       ) : (
         <ImageIcon className='size-3.5' />
       )}
-      <span className='max-w-28 truncate'>{failed ? 'Sin vista previa' : item.displayName || item.name}</span>
+      <span className='max-w-28 truncate'>
+        {failed ? 'Sin vista previa' : item.displayName || item.name}
+      </span>
     </button>
   )
 }
 
-export function ResultsTable({ results, reportId, loading = false, error = null, onRetry }: ResultsTableProps) {
+export function ResultsTable({
+  results,
+  reportId,
+  loading = false,
+  error = null,
+  onRetry,
+}: ResultsTableProps) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<ResultStatusFilter>('all')
   const [sort, setSort] = useState<ResultSort>('failures')
   const [groupByFile, setGroupByFile] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [viewer, setViewer] = useState<{ items: EvidenceItem[]; index: number } | null>(null)
+  const [viewer, setViewer] = useState<{
+    items: EvidenceItem[]
+    index: number
+  } | null>(null)
 
-  const groups = selectResultGroups(results, { query, status, sort, groupByFile })
-  const visibleCount = groups.reduce((count, group) => count + group.rows.length, 0)
+  const groups = selectResultGroups(results, {
+    query,
+    status,
+    sort,
+    groupByFile,
+  })
+  const visibleCount = groups.reduce(
+    (count, group) => count + group.rows.length,
+    0
+  )
   const totalCount = Object.keys(results).length
   const hasFilters = !!query.trim() || status !== 'all'
   const runningLabel = loading
@@ -187,7 +228,9 @@ export function ResultsTable({ results, reportId, loading = false, error = null,
           </Badge>
         </TableCell>
         <TableCell className='text-end tabular-nums'>
-          {result.duration !== undefined ? `${result.duration.toFixed(2)}s` : '—'}
+          {result.duration !== undefined
+            ? `${result.duration.toFixed(2)}s`
+            : '—'}
         </TableCell>
         <TableCell className='max-w-[360px]'>
           <div className='space-y-2'>
@@ -196,7 +239,10 @@ export function ResultsTable({ results, reportId, loading = false, error = null,
               aria-expanded={!!expanded[result.id]}
               aria-label={`Ver salida completa de ${result.id}`}
               onClick={() =>
-                setExpanded((prev) => ({ ...prev, [result.id]: !prev[result.id] }))
+                setExpanded((prev) => ({
+                  ...prev,
+                  [result.id]: !prev[result.id],
+                }))
               }
               className='flex w-full items-center gap-1 text-start text-xs text-muted-foreground hover:text-foreground'
               disabled={!hasOutput}
@@ -211,14 +257,15 @@ export function ResultsTable({ results, reportId, loading = false, error = null,
               </span>
             </button>
             {expanded[result.id] && hasOutput && (
-              <pre className='max-h-32 overflow-auto whitespace-pre-wrap rounded-md border bg-muted/20 p-2 text-xs'>
+              <pre className='max-h-32 overflow-auto rounded-md border bg-muted/20 p-2 text-xs whitespace-pre-wrap'>
                 {output}
               </pre>
             )}
             {attachments.length > 0 && (
               <div className='flex flex-wrap items-center gap-1.5'>
                 <span className='flex items-center gap-1 text-xs text-muted-foreground'>
-                  <Paperclip className='size-3.5' /> Evidencias ({attachments.length})
+                  <Paperclip className='size-3.5' /> Evidencias (
+                  {attachments.length})
                 </span>
                 {attachments.map((item, index) => (
                   <AttachmentThumbnail
@@ -250,7 +297,7 @@ export function ResultsTable({ results, reportId, loading = false, error = null,
           </p>
           <div className='mt-3 flex flex-wrap items-center gap-2'>
             <div className='relative min-w-48 flex-1'>
-              <Search className='absolute left-2.5 top-2.5 size-4 text-muted-foreground' />
+              <Search className='absolute top-2.5 left-2.5 size-4 text-muted-foreground' />
               <Input
                 aria-label='Buscar test'
                 placeholder='Buscar por test…'
@@ -259,35 +306,49 @@ export function ResultsTable({ results, reportId, loading = false, error = null,
                 className='h-9 ps-8'
               />
             </div>
-            <select
-              aria-label='Filtrar por estado'
+            <Select
               value={status}
-              onChange={(event) => setStatus(event.target.value as ResultStatusFilter)}
-              className='h-9 rounded-md border border-input bg-background px-3 text-sm'
+              onValueChange={(value) => setStatus(value as ResultStatusFilter)}
             >
-              <option value='all'>Todos los estados</option>
-              <option value='failed'>Fallido</option>
-              <option value='error'>Error</option>
-              <option value='passed'>Pasado</option>
-              <option value='skipped'>Omitido</option>
-              <option value='running'>En curso</option>
-            </select>
-            <select
-              aria-label='Ordenar resultados'
+              <SelectTrigger
+                aria-label='Filtrar por estado'
+                className='w-full min-w-44 bg-background sm:w-52'
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='all'>Todos los estados</SelectItem>
+                <SelectItem value='failed'>Fallido</SelectItem>
+                <SelectItem value='error'>Error</SelectItem>
+                <SelectItem value='passed'>Pasado</SelectItem>
+                <SelectItem value='skipped'>Omitido</SelectItem>
+                <SelectItem value='running'>En curso</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
               value={sort}
-              onChange={(event) => setSort(event.target.value as ResultSort)}
-              className='h-9 rounded-md border border-input bg-background px-3 text-sm'
+              onValueChange={(value) => setSort(value as ResultSort)}
             >
-              <option value='failures'>Ordenar: fallos primero</option>
-              <option value='duration'>Ordenar: duración</option>
-            </select>
+              <SelectTrigger
+                aria-label='Ordenar resultados'
+                className='w-full min-w-56 bg-background sm:w-64'
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='failures'>
+                  Ordenar: fallos primero
+                </SelectItem>
+                <SelectItem value='duration'>Ordenar: duración</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant='outline'
               size='sm'
               aria-pressed={groupByFile}
               onClick={() => setGroupByFile((prev) => !prev)}
             >
-              Agrupar por archivo
+              <FolderTree className='size-4' /> Agrupar por archivo
             </Button>
           </div>
         </CardHeader>
@@ -297,23 +358,51 @@ export function ResultsTable({ results, reportId, loading = false, error = null,
               <AlertCircle className='size-4' />
               <span>{error}</span>
               {onRetry && (
-                <Button variant='link' size='sm' className='h-auto p-0' onClick={onRetry}>
+                <Button
+                  variant='link'
+                  size='sm'
+                  className='h-auto p-0'
+                  onClick={onRetry}
+                >
                   <RefreshCw className='size-3.5' /> Reintentar
                 </Button>
               )}
             </div>
           )}
           {totalCount === 0 ? (
-            <p className='flex items-center gap-2 p-6 text-sm text-muted-foreground'>
-              {loading && <Loader2 className='size-4 animate-spin' aria-label='Cargando resultados' />}
-              {runningLabel}
-            </p>
+            <div className='p-4'>
+              <ExecutionEmptyState
+                icon={Search}
+                title={loading ? 'Cargando…' : 'Resultados vacíos'}
+                description={runningLabel}
+                action={
+                  !loading ? (
+                    <Button variant='outline' size='sm' asChild>
+                      <Link to='/tests'>
+                        <PlayCircle className='size-4' /> Iniciar Corrida
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Loader2
+                      className='size-4 animate-spin'
+                      aria-label='Cargando resultados'
+                    />
+                  )
+                }
+              />
+            </div>
           ) : visibleCount === 0 ? (
-            <div className='flex flex-wrap items-center gap-3 p-6 text-sm text-muted-foreground'>
-              <span>Sin coincidencias con los filtros actuales.</span>
-              <Button variant='outline' size='sm' onClick={clearFilters}>
-                Limpiar filtros
-              </Button>
+            <div className='p-4'>
+              <ExecutionEmptyState
+                icon={Search}
+                title='Sin coincidencias con los filtros actuales'
+                description='Ajusta la búsqueda o el estado para ver otros resultados.'
+                action={
+                  <Button variant='outline' size='sm' onClick={clearFilters}>
+                    <FilterX className='size-4' /> Limpiar filtros
+                  </Button>
+                }
+              />
             </div>
           ) : (
             <Table>
@@ -327,7 +416,11 @@ export function ResultsTable({ results, reportId, loading = false, error = null,
               </TableHeader>
               <TableBody>
                 {groups.map((group) => (
-                  <GroupRows key={group.file || 'all'} group={group} renderRow={renderRow} />
+                  <GroupRows
+                    key={group.file || 'all'}
+                    group={group}
+                    renderRow={renderRow}
+                  />
                 ))}
               </TableBody>
             </Table>
@@ -348,7 +441,10 @@ export function ResultsTable({ results, reportId, loading = false, error = null,
         onNext={() =>
           setViewer((prev) =>
             prev
-              ? { ...prev, index: Math.min(prev.items.length - 1, prev.index + 1) }
+              ? {
+                  ...prev,
+                  index: Math.min(prev.items.length - 1, prev.index + 1),
+                }
               : null
           )
         }
@@ -368,7 +464,10 @@ function GroupRows({
     <>
       {group.file && (
         <TableRow className='bg-muted/30'>
-          <TableCell colSpan={4} className='font-mono text-xs text-muted-foreground'>
+          <TableCell
+            colSpan={4}
+            className='font-mono text-xs text-muted-foreground'
+          >
             {group.file} ({group.rows.length})
           </TableCell>
         </TableRow>

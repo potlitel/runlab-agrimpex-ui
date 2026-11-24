@@ -1,4 +1,6 @@
 import { useEffect, useRef, type ComponentType } from 'react'
+import { Link } from '@tanstack/react-router'
+import type { ReportSummary } from '@/types/contract'
 import {
   Activity,
   AlertCircle,
@@ -9,12 +11,15 @@ import {
   Eraser,
   Loader2,
   Percent,
+  PlayCircle,
+  RefreshCw,
+  Terminal,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { ExecutionLogEntry, ExecutionProgress } from '../use-execution'
-import type { ReportSummary } from '@/types/contract'
+import { ExecutionEmptyState } from './execution-empty-state'
 
 export type ExecutionConsoleProps = {
   logs: ExecutionLogEntry[]
@@ -30,12 +35,12 @@ export type ExecutionConsoleProps = {
 }
 
 const logTone: Record<ExecutionLogEntry['kind'], string> = {
-  info: 'text-muted-foreground',
-  error: 'text-destructive',
-  success: 'text-emerald-600 dark:text-emerald-400',
-  test: 'text-foreground',
-  output: 'text-muted-foreground',
-  system: 'text-primary',
+  info: 'text-zinc-400',
+  error: 'text-rose-400',
+  success: 'text-emerald-400',
+  test: 'text-zinc-100',
+  output: 'text-zinc-400',
+  system: 'text-sky-400',
 }
 
 function formatTime(iso: string) {
@@ -76,7 +81,10 @@ export function ExecutionConsole({
                 {running ? 'En ejecución' : 'En espera'}
               </Badge>
               {summaryPartial && (
-                <Badge variant='outline' title='No se pudo consultar el detalle del reporte'>
+                <Badge
+                  variant='outline'
+                  title='No se pudo consultar el detalle del reporte'
+                >
                   Resumen parcial
                 </Badge>
               )}
@@ -86,11 +94,16 @@ export function ExecutionConsole({
             </p>
           </div>
           <div className='flex items-center gap-3 text-sm'>
-            {loading && <Loader2 className='size-4 animate-spin text-muted-foreground' aria-label='Cargando catálogo' />}
-            <span className='tabular-nums text-muted-foreground'>
+            {loading && (
+              <Loader2
+                className='size-4 animate-spin text-muted-foreground'
+                aria-label='Cargando catálogo'
+              />
+            )}
+            <span className='text-muted-foreground tabular-nums'>
               {progress.current}/{progress.total || 0}
             </span>
-            <span className='tabular-nums font-semibold'>
+            <span className='font-semibold tabular-nums'>
               {progress.percentage}%
             </span>
             {onClear && (
@@ -118,7 +131,9 @@ export function ExecutionConsole({
         >
           <div
             className='h-full rounded-full bg-primary transition-all duration-300'
-            style={{ width: `${Math.max(0, Math.min(100, progress.percentage))}%` }}
+            style={{
+              width: `${Math.max(0, Math.min(100, progress.percentage))}%`,
+            }}
           />
         </div>
         {summary && (
@@ -156,7 +171,11 @@ export function ExecutionConsole({
             <SummaryPill
               icon={Clock}
               label='Duración'
-              value={summary.duration != null ? `${summary.duration.toFixed(1)}s` : '—'}
+              value={
+                summary.duration != null
+                  ? `${summary.duration.toFixed(1)}s`
+                  : '—'
+              }
               tone='text-muted-foreground'
             />
             <SummaryPill
@@ -174,8 +193,13 @@ export function ExecutionConsole({
             <AlertCircle className='size-3.5' />
             <span>{error}</span>
             {onRetry && (
-              <Button variant='link' size='sm' className='h-auto p-0' onClick={onRetry}>
-                Reintentar
+              <Button
+                variant='link'
+                size='sm'
+                className='h-auto p-0'
+                onClick={onRetry}
+              >
+                <RefreshCw className='size-3.5' /> Reintentar
               </Button>
             )}
           </div>
@@ -185,14 +209,31 @@ export function ExecutionConsole({
           aria-label='Salida de la ejecución'
           aria-live='polite'
           aria-relevant='additions'
-          className='max-h-[360px] overflow-y-auto bg-muted/30 p-4 font-mono text-xs'
+          className='max-h-[360px] overflow-y-auto border-t border-zinc-800 bg-zinc-950 p-4 font-mono text-xs text-zinc-200 shadow-inner'
         >
           {logs.length === 0 ? (
-            <p className='text-muted-foreground'>
-              {running
-                ? 'Esperando eventos de ejecución…'
-                : 'Sin actividad reciente. Inicia una corrida para ver el progreso.'}
-            </p>
+            running ? (
+              <ExecutionEmptyState
+                variant='terminal'
+                icon={Clock}
+                title='Esperando eventos de ejecución…'
+                description='La salida aparecerá aquí a medida que avance la corrida.'
+              />
+            ) : (
+              <ExecutionEmptyState
+                variant='terminal'
+                icon={Terminal}
+                title='Consola en espera'
+                description='Sin actividad reciente. Inicia una corrida para ver el progreso.'
+                action={
+                  <Button variant='outline' size='sm' asChild>
+                    <Link to='/tests'>
+                      <PlayCircle className='size-4' /> Iniciar Corrida
+                    </Link>
+                  </Button>
+                }
+              />
+            )
           ) : (
             <div className='space-y-1'>
               {logs.map((entry) => (
@@ -227,7 +268,7 @@ function SummaryPill({
     <div className='flex items-center gap-2 rounded-md border bg-card px-2 py-1.5'>
       <Icon className={`size-3.5 ${tone}`} />
       <span className='text-muted-foreground'>{label}</span>
-      <span className={`ms-auto tabular-nums font-semibold ${tone}`}>
+      <span className={`ms-auto font-semibold tabular-nums ${tone}`}>
         {value}
       </span>
     </div>

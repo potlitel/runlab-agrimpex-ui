@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProjectContextCard } from './project-context-card'
 
@@ -35,7 +35,9 @@ describe('ProjectContextCard (compact)', () => {
     mocks.get.mockResolvedValue({
       projectPath: '/proyectos/qa',
       playwrightCmd: 'npx playwright test',
-      projectFeatures: { mcp: { detected: true, signals: ['@playwright/mcp'] } },
+      projectFeatures: {
+        mcp: { detected: true, signals: ['@playwright/mcp'] },
+      },
     })
   })
 
@@ -56,7 +58,9 @@ describe('ProjectContextCard (compact)', () => {
     expect(screen.getByText('checkout')).toBeTruthy()
     expect(screen.getByText('4')).toBeTruthy()
     expect(screen.getByText('2')).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Ir a Tests' }).getAttribute('href')).toBe('/tests')
+    expect(
+      screen.getByRole('link', { name: 'Ir a Tests' }).getAttribute('href')
+    ).toBe('/tests')
   })
 
   it('omite datos desconocidos en corridas heredadas', async () => {
@@ -67,16 +71,34 @@ describe('ProjectContextCard (compact)', () => {
     expect(screen.getByText('No registrado en esta corrida')).toBeTruthy()
   })
 
+  it('ofrece configurar el proyecto cuando no hay ruta registrada', async () => {
+    mocks.get.mockResolvedValue({ projectPath: '' })
+    renderCard()
+
+    expect(
+      (await screen.findAllByText('Proyecto sin configurar')).length
+    ).toBeGreaterThan(0)
+    expect(screen.getByText(/Configura la ruta del proyecto/)).toBeTruthy()
+    const configure = screen.getByRole('link', { name: 'Configurar Proyecto' })
+    expect(configure.getAttribute('href')).toBe('/settings')
+    expect(configure.querySelector('svg')).not.toBeNull()
+    expect(screen.getAllByText('No registrado').length).toBeGreaterThan(0)
+  })
+
   it('ofrece reintento y acceso a Ajustes cuando falla la configuración', async () => {
     mocks.get.mockRejectedValue(new Error('Config no disponible'))
     renderCard()
 
     expect(await screen.findByText('Config no disponible')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Ir a Ajustes' }).getAttribute('href')).toBe('/settings')
+    expect(
+      screen.getByRole('link', { name: 'Ir a Ajustes' }).getAttribute('href')
+    ).toBe('/settings')
 
     mocks.get.mockResolvedValue({ projectPath: '/proyectos/qa' })
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
-    await waitFor(() => expect(screen.queryByText('Config no disponible')).toBeNull())
+    await waitFor(() =>
+      expect(screen.queryByText('Config no disponible')).toBeNull()
+    )
   })
 })
