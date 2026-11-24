@@ -1,4 +1,5 @@
 import {
+  Activity,
   LayoutDashboard,
   FlaskConical,
   BarChart3,
@@ -89,6 +90,11 @@ export const sidebarData: SidebarData = {
     {
       title: 'Sistema',
       items: [
+        {
+          title: 'Salud',
+          url: '/health',
+          icon: Activity,
+        },
         {
           title: 'Ajustes',
           url: '/settings',

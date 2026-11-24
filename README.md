@@ -17,6 +17,7 @@ Frontend del dashboard QA **RunLab Agrimpex** para gestionar perfiles, configura
 - [Configuración del proyecto y `playwrightCmd`](#configuración-del-proyecto-y-playwrightcmd)
 - [Evidencia gráfica: defaults, nombres y rollback](#evidencia-gráfica-defaults-nombres-y-rollback)
 - [Estado del backend y badge de salud](#estado-del-backend-y-badge-de-salud)
+- [Vista de salud](#vista-de-salud)
 
 ## Arquitectura
 
@@ -309,6 +310,7 @@ El kit de tests ya está montado en su ruta original, así que los perfiles cons
 - **Calendarización (`/schedules`)**: programación de ejecuciones automáticas.
 - **Datos de prueba (`/data`)**: fuentes de datos TXT/JSON (según módulos habilitados).
 - **Ajustes (`/settings`)**: configuración de proyecto/rutas, módulos (feature flags), automatización, perfiles y sistema. Incluye la tarjeta **Evidencias de ejecución (Playwright)** para controlar capturas (screenshot/video/trace y página completa) por perfil.
+- **Salud (`/health`)**: estado general del backend, uptime, `failedChecks` y listado de checks críticos e informativos con reintento manual.
 
 ## Header y herramientas globales
 
@@ -347,6 +349,12 @@ El header muestra una badge informativa del backend junto al cambio de tema. No 
 `failedChecks` contiene identificadores estables (`profiles`, `reports`, `evidenceGallery`, `profile`, `projectPath`, `playwrightKit`, `scheduler`, `socket`, `dockerGrid`). El estado `not_configured` no cuenta como fallo. La respuesta de salud no incluye rutas, tokens ni valores de entorno; por eso la badge solo muestra los ids y un mensaje genérico.
 
 Cuando el estado no es `ok`, aparece el botón de reintento: llama a `refresh()` y vuelve a consultar `/api/health/detail` sin recargar la página ni reiniciar otras vistas.
+
+### Vista de salud
+
+La ruta `/health` (visible en **Sistema > Salud**) reutiliza `useHealth` para mostrar el mismo estado del header con detalle: estado general, tiempo activo, `failedChecks` y dos listados con los checks **críticos** e **informativos**, sus mensajes genéricos y su estado (`OK`, `Degradado`, `Crítico`, `Sin configurar`). El botón **Actualizar** dispara el mismo `refresh()` que la badge, sin recargar la página.
+
+En caso de desconexión se muestra un aviso, pero las vistas y las queries siguen funcionando: la página es informativa y no introduce ninguna compuerta. El intervalo de sondeo sigue siendo el mismo que el de la badge (30 s).
 
 ### Rollback
 
@@ -418,6 +426,7 @@ src/
     errors/          # evidencia de fallos
     environment/     # archivos .env y entornos guardados
     docker/          # control/estado Docker
+    health/          # vista de salud del backend
     schedules/       # calendarización
     test-data/       # datos TXT/JSON
     settings/        # configuración, módulos, automatización, perfiles, sistema
