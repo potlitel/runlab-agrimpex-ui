@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Activity, ChevronDown, RefreshCw, Settings2, Timer } from 'lucide-react'
+import { Activity, ChevronDown, RefreshCw, Settings2 } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
@@ -21,16 +21,15 @@ import {
 import { useHealth } from '@/hooks/use-health'
 import type { HealthCheck } from '@/types/contract'
 import { HealthGauge, HealthSparkline } from './health-charts'
+import { HealthPollTimer } from './health-poll-timer'
 import {
   CHECK_BADGE_CLASSES,
   CHECK_ICONS,
   CHECK_NAMES,
   CHECK_STATUS_LABELS,
   DEFAULT_CHECK_ICON,
-  POLL_INTERVAL_SECONDS,
   STATUS_BADGE_CLASSES,
   STATUS_LABELS,
-  formatExactTime,
   formatRelativeTime,
   formatUptime,
   sanitizeCheckMessage,
@@ -162,11 +161,6 @@ export function HealthPage() {
   }, [])
 
   const remainingSeconds = secondsUntilNextPoll(dataUpdatedAt, now)
-  const ringRadius = 12
-  const ringCircumference = 2 * Math.PI * ringRadius
-  const ringOffset =
-    ringCircumference *
-    (remainingSeconds / POLL_INTERVAL_SECONDS)
 
   return (
     <>
@@ -184,60 +178,8 @@ export function HealthPage() {
             </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
-            {isFetching ? (
-              <span
-                data-testid='health-refresh-pulse'
-                aria-label='Refrescando estado'
-                className='size-2 animate-pulse rounded-full bg-emerald-500'
-              />
-            ) : null}
-            <span
-              data-testid='health-countdown'
-              aria-label={`Próximo sondeo en ${remainingSeconds} segundos`}
-              className='inline-flex items-center gap-1 text-xs text-muted-foreground'
-            >
-              <Timer className='size-3.5' /> {remainingSeconds} s
-            </span>
-            <Button
-              size='sm'
-              variant='outline'
-              className='gap-2 rounded-full ps-1 pe-3'
-              onClick={refresh}
-            >
-              <span
-                data-testid='health-poll-ring'
-                className='relative inline-flex size-7 items-center justify-center'
-              >
-                <svg
-                  className='absolute inset-0 -rotate-90'
-                  width='28'
-                  height='28'
-                  viewBox='0 0 28 28'
-                  aria-hidden='true'
-                >
-                  <circle
-                    cx='14'
-                    cy='14'
-                    r={ringRadius}
-                    fill='none'
-                    strokeWidth='2'
-                    className='stroke-muted'
-                  />
-                  <circle
-                    cx='14'
-                    cy='14'
-                    r={ringRadius}
-                    fill='none'
-                    strokeWidth='2'
-                    strokeLinecap='round'
-                    className='stroke-primary'
-                    strokeDasharray={ringCircumference}
-                    strokeDashoffset={ringOffset}
-                  />
-                </svg>
-                <RefreshCw className='size-4' />
-              </span>
-              Actualizar
+            <Button size='sm' variant='outline' onClick={refresh}>
+              <RefreshCw className='size-4' /> Actualizar
             </Button>
             <HeaderTools />
           </div>
@@ -254,26 +196,20 @@ export function HealthPage() {
                     Sondeo automático cada 30 s sobre /api/health/detail
                   </CardDescription>
                 </div>
-                <div className='flex items-center gap-3'>
+                <div className='flex items-center gap-4'>
                   <HealthGauge value={healthPercentage} />
-                  <div className='flex flex-col items-start gap-1'>
-                    <Badge
-                      variant='outline'
-                      className={`text-sm ${STATUS_BADGE_CLASSES[status]}`}
-                      aria-label={`Estado del backend: ${label}`}
-                    >
-                      {label}
-                    </Badge>
-                    {dataUpdatedAt ? (
-                      <span
-                        data-testid='health-last-updated'
-                        className='text-xs text-muted-foreground'
-                        title={new Date(dataUpdatedAt).toLocaleString()}
-                      >
-                        Actualizado: {formatExactTime(dataUpdatedAt)}
-                      </span>
-                    ) : null}
-                  </div>
+                  <Badge
+                    variant='outline'
+                    className={`text-sm ${STATUS_BADGE_CLASSES[status]}`}
+                    aria-label={`Estado del backend: ${label}`}
+                  >
+                    {label}
+                  </Badge>
+                  <HealthPollTimer
+                    remainingSeconds={remainingSeconds}
+                    dataUpdatedAt={dataUpdatedAt}
+                    isFetching={isFetching}
+                  />
                 </div>
               </div>
             </CardHeader>

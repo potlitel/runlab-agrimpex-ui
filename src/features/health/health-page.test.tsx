@@ -253,6 +253,17 @@ describe('HealthPage', () => {
     expect(screen.queryByTestId('health-sparkline')).toBeNull()
   })
 
+  it('ubica el temporizador en la tarjeta de Estado general y no en la cabecera', () => {
+    render(<HealthPage />)
+
+    const banner = screen.getByRole('banner')
+    expect(within(banner).queryByTestId('health-poll-timer')).toBeNull()
+    expect(within(banner).queryByTestId('health-countdown')).toBeNull()
+    expect(within(banner).getByRole('button', { name: 'Actualizar' })).toBeTruthy()
+    expect(screen.getByTestId('health-poll-timer')).toBeTruthy()
+    expect(screen.getByText('Estado general')).toBeTruthy()
+  })
+
   it('mantiene el skeleton con una sola muestra en caché', () => {
     health.state.history = [
       { at: Date.now(), uptimeSeconds: 10, okPercentage: 100 },
