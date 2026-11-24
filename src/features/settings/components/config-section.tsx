@@ -8,7 +8,16 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
-import type { Config, EvidenceConfig, ScreenshotMode, TraceMode, VideoMode } from '@/types/contract'
+import {
+  EVIDENCE_DEFAULTS,
+  type Config,
+  type EvidenceConfig,
+  type ScreenshotImageFormat,
+  type ScreenshotMode,
+  type ScreenshotScale,
+  type TraceMode,
+  type VideoMode,
+} from '@/types/contract'
 import type { UseConfigSettingsReturn } from '../use-config-settings'
 
 type Props = {
@@ -268,6 +277,68 @@ function ConfigForm({ initial, settings }: { initial: Config; settings: UseConfi
                 checked={!!form.evidence?.fullPage}
                 onCheckedChange={(v) => setEvidence('fullPage', v ? true : undefined)}
               />
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className='grid gap-4 md:grid-cols-3'>
+            <div className='space-y-1.5'>
+              <Label htmlFor='evidence-image-format'>Formato de captura</Label>
+              <Select
+                value={form.evidence?.imageFormat ?? 'default'}
+                onValueChange={(v) => setEvidence('imageFormat', v === 'default' ? undefined : (v as ScreenshotImageFormat))}
+              >
+                <SelectTrigger id='evidence-image-format' className='w-full'>
+                  <SelectValue placeholder='Predeterminado' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='default'>Predeterminado ({EVIDENCE_DEFAULTS.imageFormat})</SelectItem>
+                  <SelectItem value='png'>PNG</SelectItem>
+                  <SelectItem value='jpeg'>JPEG</SelectItem>
+                  <SelectItem value='jpg'>JPG</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className='text-xs text-muted-foreground'>El helper del kit usa este formato al guardar la evidencia.</p>
+            </div>
+            <div className='space-y-1.5'>
+              <Label htmlFor='evidence-image-quality'>Calidad JPEG (1–100)</Label>
+              <Input
+                id='evidence-image-quality'
+                type='number'
+                min={1}
+                max={100}
+                value={form.evidence?.imageQuality ?? ''}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  const quality = raw === '' ? undefined : Number(raw)
+                  setEvidence(
+                    'imageQuality',
+                    Number.isInteger(quality) && quality! >= 1 && quality! <= 100
+                      ? (quality as number)
+                      : undefined,
+                  )
+                }}
+                placeholder={`Predeterminado: ${EVIDENCE_DEFAULTS.imageQuality}`}
+              />
+              <p className='text-xs text-muted-foreground'>Solo afecta a JPEG/JPG; PNG ignora la calidad.</p>
+            </div>
+            <div className='space-y-1.5'>
+              <Label htmlFor='evidence-scale'>Escala del screenshot</Label>
+              <Select
+                value={form.evidence?.scale ?? 'default'}
+                onValueChange={(v) => setEvidence('scale', v === 'default' ? undefined : (v as ScreenshotScale))}
+              >
+                <SelectTrigger id='evidence-scale' className='w-full'>
+                  <SelectValue placeholder='Predeterminado' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='default'>Predeterminada ({EVIDENCE_DEFAULTS.scale})</SelectItem>
+                  <SelectItem value='css'>CSS</SelectItem>
+                  <SelectItem value='device'>Dispositivo</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className='text-xs text-muted-foreground'>Se inyecta como RUNLAB_SCREENSHOT_SCALE en la corrida.</p>
             </div>
           </div>
         </CardContent>

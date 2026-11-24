@@ -133,8 +133,15 @@ export const reportsApi = {
   delete: (id: string) => del<{ success: boolean }>(`/reports/${encodeURIComponent(id)}`),
   downloadJsonUrl: (id: string) => `${API_BASE_URL}/reports/${encodeURIComponent(id)}/download/json`,
   downloadHtmlUrl: (id: string) => `${API_BASE_URL}/reports/${encodeURIComponent(id)}/download/html`,
-  assetUrl: (id: string, assetPath: string) =>
-    `${API_BASE_URL}/reports/${encodeURIComponent(id)}/assets/${assetPath}`,
+  assetUrl: (id: string, assetPath: string) => {
+    const encodedPath = String(assetPath)
+      .replace(/\\/g, '/')
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')
+    return `${API_BASE_URL}/reports/${encodeURIComponent(id)}/assets/${encodedPath}`
+  },
 }
 
 // ── Env / variables (.env files) ─────────────────────────────────────────

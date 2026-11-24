@@ -14,6 +14,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { EvidenceDialog } from '@/features/errors/components/evidence-viewer'
+import {
+  normalizeCaptureOrigin,
+  normalizeEvidenceMetadata,
+  normalizeEvidenceStatus,
+} from '@/lib/evidence'
 import type { EvidenceItem, EvidenceKind } from '@/types/contract'
 import type { ExecutionTestResult } from '../use-execution'
 import {
@@ -73,22 +78,30 @@ function toEvidenceItem(
   if (!url) return null
 
   const name = String(attachment.name ?? assetPath ?? 'adjunto')
-  return {
+  const captureName =
+    typeof attachment.captureName === 'string'
+      ? attachment.captureName
+      : name
+  return normalizeEvidenceMetadata({
     id: `${result.id}:${assetPath || name}`,
     name,
     displayName: name,
     kind: attachmentKind(attachment),
-    source: 'report',
+    source: 'report' as const,
     ...(reportId ? { reportId } : {}),
     testId: result.id,
-    status: result.status,
+    status: normalizeEvidenceStatus(result.status),
+    evidenceSource: normalizeCaptureOrigin(attachment.evidenceSource),
+    captureName,
+    width: attachment.width as number | null | undefined,
+    height: attachment.height as number | null | undefined,
     ...(assetPath ? { assetPath } : {}),
     ...(typeof attachment.contentType === 'string'
       ? { contentType: attachment.contentType }
       : {}),
     url,
     downloadUrl: url,
-  }
+  })
 }
 
 function AttachmentThumbnail({
@@ -106,13 +119,13 @@ function AttachmentThumbnail({
       type='button'
       onClick={onOpen}
       className='flex items-center gap-1.5 overflow-hidden rounded-md border bg-muted/20 px-2 py-1 text-xs text-muted-foreground hover:border-primary/40'
-      title={`Abrir evidencia ${item.displayName || item.name}`}
+      title={`Abrir evidencia ${item.displayName || item.name}${item.step ? ` · paso ${item.step}` : ''}${item.width != null && item.height != null ? ` · ${item.width}×${item.height} px` : ''}`}
     >
       {isImage && !failed ? (
         <img
           src={item.url}
           alt={item.displayName || item.name}
-          className='h-8 w-10 object-cover'
+          className='h-8 w-10 object-contain'
           onError={() => setFailed(true)}
         />
       ) : (

@@ -63,12 +63,27 @@ export interface ProjectFeatures {
 export type ScreenshotMode = 'always' | 'only-on-failure' | 'off'
 export type VideoMode = 'on' | 'off' | 'retain-on-failure' | 'on-first-retry'
 export type TraceMode = 'on' | 'off' | 'retain-on-failure' | 'on-first-retry'
+export type ScreenshotImageFormat = 'png' | 'jpeg' | 'jpg'
+export type ScreenshotScale = 'css' | 'device'
+
+/** Defaults compartidos con el runner y el helper del kit de Playwright. */
+export const EVIDENCE_DEFAULTS = {
+  imageFormat: 'png',
+  imageQuality: 90,
+  scale: 'css',
+  screenshotTimeout: 30000,
+} as const satisfies Pick<Required<EvidenceConfig>, 'imageFormat' | 'imageQuality' | 'scale'> & {
+  screenshotTimeout: number
+}
 
 export interface EvidenceConfig {
   screenshot?: ScreenshotMode
   video?: VideoMode
   trace?: TraceMode
   fullPage?: boolean
+  imageFormat?: ScreenshotImageFormat
+  imageQuality?: number
+  scale?: ScreenshotScale
 }
 
 export interface Config {
@@ -176,11 +191,26 @@ export interface ReportListItem {
   [key: string]: unknown
 }
 
-export interface ReportAttachment {
+export type EvidenceTestStatus = 'passed' | 'failed' | 'error'
+export type EvidenceCaptureOrigin = 'capture' | 'failure-artifact'
+
+/** Metadatos de trazabilidad compartidos por adjuntos e ítems de galería. */
+export interface EvidenceMetadata {
+  status?: EvidenceTestStatus | null
+  evidenceSource?: EvidenceCaptureOrigin | null
+  captureName?: string | null
+  /** Paso lógico dentro del test, derivado de `captureName` cuando la API no lo envía. */
+  step?: string | null
+  width?: number | null
+  height?: number | null
+}
+
+export interface ReportAttachment extends EvidenceMetadata {
   name?: string
   contentType?: string
   path?: string
   assetPath?: string
+  source?: EvidenceSource
   [key: string]: unknown
 }
 
@@ -191,7 +221,24 @@ export interface ReportTestResult {
   output?: string
   errorMsg?: string
   attachments?: ReportAttachment[]
+  /** Capturas declaradas por el test mediante anotaciones `expected-screenshot`. */
+  expectedScreenshots?: string[]
   project?: string
+  [key: string]: unknown
+}
+
+export interface EvidenceIntegrityIssue {
+  type: 'missing-screenshot' | 'invalid-image'
+  testId?: string | null
+  name?: string
+  message?: string
+  [key: string]: unknown
+}
+
+export interface EvidenceIntegrity {
+  issues?: EvidenceIntegrityIssue[]
+  missingScreenshots?: Array<{ testId?: string | null; name?: string }>
+  invalidImages?: Array<{ testId?: string | null; name?: string; message?: string }>
   [key: string]: unknown
 }
 
@@ -200,6 +247,9 @@ export interface ReportDetail {
   timestamp?: string
   summary: ReportSummary
   tests: ReportTestResult[]
+  integrity?: EvidenceIntegrity
+  /** Variables RUNLAB_SCREENSHOT_* efectivas de la corrida. */
+  evidenceEnv?: Record<string, string>
   [key: string]: unknown
 }
 
@@ -242,13 +292,14 @@ export interface ReportExportProfile {
   [key: string]: unknown
 }
 
-export interface ReportExportAttachment {
+export interface ReportExportAttachment extends EvidenceMetadata {
   name?: string
   contentType?: string
   path?: string
   assetPath?: string
   assetUrl?: string
   kind?: 'image' | 'other' | string
+  source?: EvidenceSource
   [key: string]: unknown
 }
 
@@ -431,7 +482,7 @@ export interface FeatureFlags {
 export type EvidenceKind = 'image' | 'video' | 'trace' | 'context' | 'other'
 export type EvidenceSource = 'folder' | 'report'
 
-export interface EvidenceItem {
+export interface EvidenceItem extends EvidenceMetadata {
   id: string
   name: string
   displayName?: string
@@ -443,7 +494,7 @@ export interface EvidenceItem {
   reportId?: string | null
   reportTimestamp?: string | null
   testId?: string | null
-  status?: string | null
+  status?: EvidenceTestStatus | null
   assetPath?: string | null
   contentType?: string | null
   url: string

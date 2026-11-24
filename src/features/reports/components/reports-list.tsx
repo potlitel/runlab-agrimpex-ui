@@ -77,7 +77,7 @@ function PreviewThumb({
       <img
         src={reportsApi.assetUrl(reportId, preview)}
         alt={`Vista previa de ${reportId}`}
-        className='h-16 w-28 object-cover transition-transform duration-200 group-hover:scale-110'
+        className='h-16 w-28 object-contain transition-transform duration-200 group-hover:scale-110'
         loading='lazy'
         onError={() => setBroken(true)}
       />

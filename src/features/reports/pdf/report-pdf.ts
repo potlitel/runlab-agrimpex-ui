@@ -250,27 +250,206 @@ function normalizeRecentRuns(runs: unknown): ReportAnalyticsRecentRun[] {
     }))
 }
 
-async function fetchImageDataUrl(url: string): Promise<string | null> {
+/** Tiempo máximo esperando el asset y la decodificación de imágenes convertidas. */
+export const IMAGE_FETCH_TIMEOUT_MS = 15_000
+export const IMAGE_LOAD_TIMEOUT_MS = 10_000
+
+const MAX_IMAGE_WIDTH = 150
+const MAX_IMAGE_HEIGHT = 80
+
+type PdfImageFormat = 'PNG' | 'JPEG' | 'GIF' | 'BMP'
+type ImageBytes = Uint8Array
+
+function bytesFromDataUrl(dataUrl: string): ImageBytes | null {
+  const match = /^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(dataUrl)
+  if (!match) return null
   try {
-    const res = await fetch(url)
+    if (match[2]) {
+      const binary = atob(match[3])
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+      return bytes
+    }
+    return new TextEncoder().encode(decodeURIComponent(match[3]))
+  } catch {
+    return null
+  }
+}
+
+function hex(bytes: ImageBytes, from: number, to: number): string {
+  return Array.from(bytes.slice(from, to))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+function detectImageFormat(bytes: ImageBytes | null, contentType?: string | null): PdfImageFormat | 'WEBP' | null {
+  const head = bytes ? hex(bytes, 0, 12) : ''
+  if (head.startsWith('89504e470d0a1a0a')) return 'PNG'
+  if (head.startsWith('ffd8ff')) return 'JPEG'
+  if (head.startsWith('52494646') && head.slice(16, 24) === '57454250') return 'WEBP'
+  if (head.startsWith('47494638')) return 'GIF'
+  if (head.startsWith('424d')) return 'BMP'
+
+  const mime = String(contentType || '').split(';')[0]!.trim().toLowerCase()
+  if (mime === 'image/png') return 'PNG'
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return 'JPEG'
+  if (mime === 'image/webp') return 'WEBP'
+  if (mime === 'image/gif') return 'GIF'
+  if (mime === 'image/bmp') return 'BMP'
+  return null
+}
+
+function dimensionsFromBytes(bytes: ImageBytes, format: PdfImageFormat | 'WEBP') {
+  if (format === 'PNG' && bytes.length >= 24) {
+    const width = (bytes[16]! << 24) | (bytes[17]! << 16) | (bytes[18]! << 8) | bytes[19]!
+    const height = (bytes[20]! << 24) | (bytes[21]! << 16) | (bytes[22]! << 8) | bytes[23]!
+    return width > 0 && height > 0 ? { width, height } : null
+  }
+  if (format === 'JPEG') {
+    let offset = 2
+    while (offset + 9 < bytes.length) {
+      if (bytes[offset] !== 0xff) {
+        offset += 1
+        continue
+      }
+      let marker = bytes[offset + 1]!
+      while (marker === 0xff) {
+        offset += 1
+        marker = bytes[offset + 1]!
+      }
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+        offset += 2
+        continue
+      }
+      if (marker === 0xd9 || marker === 0xda) break
+      const segmentLength = (bytes[offset + 2]! << 8) | bytes[offset + 3]!
+      const isSof =
+        marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc
+      if (isSof && offset + 8 < bytes.length) {
+        const height = (bytes[offset + 5]! << 8) | bytes[offset + 6]!
+        const width = (bytes[offset + 7]! << 8) | bytes[offset + 8]!
+        return width > 0 && height > 0 ? { width, height } : null
+      }
+      offset += 2 + segmentLength
+    }
+    return null
+  }
+  if (format === 'WEBP' && bytes.length >= 30) {
+    const chunk = String.fromCharCode(...bytes.slice(12, 16))
+    if (chunk === 'VP8X' && bytes.length >= 30) {
+      const width = 1 + bytes[24]! + (bytes[25]! << 8) + (bytes[26]! << 16)
+      const height = 1 + bytes[27]! + (bytes[28]! << 8) + (bytes[29]! << 16)
+      return { width, height }
+    }
+    if (chunk === 'VP8L' && bytes.length >= 25) {
+      const bits = bytes[21]! | (bytes[22]! << 8) | (bytes[23]! << 16) | (bytes[24]! << 24)
+      return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 }
+    }
+    if (chunk === 'VP8 ' && bytes.length >= 30) {
+      const width = bytes[26]! | ((bytes[27]! & 0x3f) << 8)
+      const height = bytes[28]! | ((bytes[29]! & 0x3f) << 8)
+      return { width, height }
+    }
+    return null
+  }
+  if (format === 'GIF' && bytes.length >= 10) {
+    return { width: bytes[6]! | (bytes[7]! << 8), height: bytes[8]! | (bytes[9]! << 8) }
+  }
+  if (format === 'BMP' && bytes.length >= 26) {
+    return {
+      width: Math.abs(bytes[18]! | (bytes[19]! << 8) | (bytes[20]! << 16) | (bytes[21]! << 24)),
+      height: Math.abs(bytes[22]! | (bytes[23]! << 8) | (bytes[24]! << 16) | (bytes[25]! << 24)),
+    }
+  }
+  return null
+}
+
+function resolveDimensions(
+  metaWidth: unknown,
+  metaHeight: unknown,
+  bytes: ImageBytes | null,
+  format: PdfImageFormat | 'WEBP' | null
+) {
+  const width = asNumber(metaWidth, 0)
+  const height = asNumber(metaHeight, 0)
+  if (width > 0 && height > 0) return { width, height }
+  return bytes && format ? dimensionsFromBytes(bytes, format) : null
+}
+
+function fitImageBox(width: number, height: number) {
+  const scale = Math.min(MAX_IMAGE_WIDTH / width, MAX_IMAGE_HEIGHT / height)
+  return { w: width * scale, h: height * scale }
+}
+
+function convertWebpToPng(dataUrl: string, width = 0, height = 0): Promise<string | null> {
+  if (typeof Image === 'undefined' || typeof document === 'undefined') return Promise.resolve(null)
+  return new Promise((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let settled = false
+    const finish = (value: string | null) => {
+      if (settled) return
+      settled = true
+      if (timer) clearTimeout(timer)
+      resolve(value)
+    }
+    timer = setTimeout(() => finish(null), IMAGE_LOAD_TIMEOUT_MS)
+    try {
+      const image = new Image()
+      image.onload = () => {
+        try {
+          const realWidth = image.naturalWidth || image.width || width
+          const realHeight = image.naturalHeight || image.height || height
+          if (!realWidth || !realHeight) return finish(null)
+          const canvas = document.createElement('canvas')
+          canvas.width = realWidth
+          canvas.height = realHeight
+          const context = canvas.getContext('2d')
+          if (!context) return finish(null)
+          context.drawImage(image, 0, 0, realWidth, realHeight)
+          finish(canvas.toDataURL('image/png'))
+        } catch {
+          finish(null)
+        }
+      }
+      image.onerror = () => finish(null)
+      image.src = dataUrl
+    } catch {
+      finish(null)
+    }
+  })
+}
+
+type FetchedImage = { dataUrl: string; contentType: string | null }
+
+async function fetchImageDataUrl(url: string): Promise<FetchedImage | null> {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+  const timer = controller ? setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS) : undefined
+  try {
+    const res = await fetch(url, controller ? { signal: controller.signal } : undefined)
     if (!res.ok) return null
     const blob = await res.blob()
-    if (!blob.type.startsWith('image/')) return null
+    const contentType = res.headers?.get?.('content-type') || blob.type || null
+    if (contentType && !contentType.startsWith('image/')) return null
+    let dataUrl: string | null = null
     if (typeof FileReader !== 'undefined') {
-      return await new Promise<string>((resolve, reject) => {
+      dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => resolve(String(reader.result))
         reader.onerror = () => reject(reader.error)
         reader.readAsDataURL(blob)
       })
+    } else {
+      const bytes = new Uint8Array(await blob.arrayBuffer())
+      let binary = ''
+      for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]!)
+      const b64 = typeof btoa === 'function' ? btoa(binary) : ''
+      dataUrl = b64 ? `data:${contentType || 'image/png'};base64,${b64}` : null
     }
-    const bytes = new Uint8Array(await blob.arrayBuffer())
-    let binary = ''
-    for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]!)
-    const b64 = typeof btoa === 'function' ? btoa(binary) : ''
-    return b64 ? `data:${blob.type};base64,${b64}` : null
+    return dataUrl ? { dataUrl, contentType } : null
   } catch {
     return null
+  } finally {
+    if (timer) clearTimeout(timer)
   }
 }
 
@@ -469,46 +648,19 @@ export async function generateRunPdf(
       doc.setTextColor(0, 0, 0)
     } else {
       for (const att of allAttachments) {
-        y = ensureSpace(doc, y, 58)
-        const label = `${sanitizeText(att.testId, 80)} — ${sanitizeText(att.name || att.path || att.assetPath || 'adjunto', 80)}`
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(8)
-        doc.setTextColor(51, 65, 85)
-        doc.text(doc.splitTextToSize(label, CONTENT_WIDTH), PAGE_MARGIN, y)
-        doc.setTextColor(0, 0, 0)
-        y += 4
-
+        const reference = String(att.assetPath || att.path || att.name || 'adjunto')
         const isImage =
           String(att.kind || att.contentType || '').toLowerCase().includes('image') ||
-          /\.(png|jpe?g|gif|webp)$/i.test(String(att.assetPath || att.path || att.name || ''))
+          /\.(png|jpe?g|gif|webp|bmp)$/i.test(reference)
 
-        if (isImage) {
-          const assetUrl =
-            att.assetUrl ||
-            (att.assetPath && payload.report?.id
-              ? reportsApi.assetUrl(payload.report.id, att.assetPath)
-              : null)
-          const dataUrl = assetUrl ? await fetchImageDataUrl(assetUrl) : null
-          if (dataUrl) {
-            try {
-              const fmt = dataUrl.includes('image/jpeg') || dataUrl.includes('image/jpg') ? 'JPEG' : 'PNG'
-              doc.addImage(dataUrl, fmt, PAGE_MARGIN, y, 90, 50, undefined, 'FAST')
-              y += 54
-            } catch {
-              drawImagePlaceholder(doc, PAGE_MARGIN, y, 90, 50, 'Sin evidencia disponible')
-              y += 54
-            }
-          } else {
-            drawImagePlaceholder(doc, PAGE_MARGIN, y, 90, 50, 'Sin evidencia')
-            y += 54
-          }
-        } else {
+        if (!isImage) {
+          y = ensureSpace(doc, y, 12)
           doc.setFont('helvetica', 'normal')
           doc.setFontSize(9)
           doc.setTextColor(...BRAND.muted)
           doc.text(
             doc.splitTextToSize(
-              `Adjunto no imagen: ${sanitizeText(att.contentType || att.path || att.assetPath || att.name || '—', 120)}`,
+              `Adjunto no imagen: ${sanitizeText(att.contentType || reference, 120)}`,
               CONTENT_WIDTH
             ),
             PAGE_MARGIN,
@@ -516,7 +668,67 @@ export async function generateRunPdf(
           )
           doc.setTextColor(0, 0, 0)
           y += 8
+          continue
         }
+
+        const assetUrl =
+          att.assetUrl ||
+          (att.assetPath && payload.report?.id
+            ? reportsApi.assetUrl(payload.report.id, att.assetPath)
+            : null)
+        const fetched = assetUrl ? await fetchImageDataUrl(assetUrl) : null
+        const bytes = fetched ? bytesFromDataUrl(fetched.dataUrl) : null
+        const format = fetched ? detectImageFormat(bytes, fetched.contentType) : null
+        let dataUrl = fetched?.dataUrl ?? null
+        let pdfFormat: PdfImageFormat | null = format === 'WEBP' ? 'PNG' : format
+        if (dataUrl && format === 'WEBP') {
+          const dimensions = resolveDimensions(att.width, att.height, bytes, format)
+          dataUrl = await convertWebpToPng(dataUrl, dimensions?.width, dimensions?.height)
+        }
+
+        let box = fitImageBox(16, 9)
+        let dimensions: { width: number; height: number } | null = null
+        if (dataUrl && pdfFormat) {
+          const convertedBytes = bytesFromDataUrl(dataUrl)
+          const sourceFormat: PdfImageFormat | 'WEBP' | null = format === 'WEBP' ? 'PNG' : format
+          dimensions = resolveDimensions(att.width, att.height, convertedBytes, sourceFormat)
+          if (dimensions) box = fitImageBox(dimensions.width, dimensions.height)
+        }
+
+        const detail = dimensions
+          ? `${Math.round(dimensions.width)}×${Math.round(dimensions.height)} px · ${pdfFormat || 'imagen'}`
+          : pdfFormat || 'imagen'
+        const label = sanitizeText(
+          `${att.testId || ''} — ${att.name || reference} — ${detail}`,
+          160
+        )
+        const labelLines = doc.splitTextToSize(label, CONTENT_WIDTH)
+        y = ensureSpace(doc, y, labelLines.length * 3.5 + box.h + 3)
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(8)
+        doc.setTextColor(51, 65, 85)
+        doc.text(labelLines, PAGE_MARGIN, y)
+        doc.setTextColor(0, 0, 0)
+        y += labelLines.length * 3.5 + 1
+
+        if (dataUrl && pdfFormat) {
+          try {
+            doc.addImage(dataUrl, pdfFormat, PAGE_MARGIN, y, box.w, box.h, undefined, 'FAST')
+          } catch {
+            drawImagePlaceholder(
+              doc,
+              PAGE_MARGIN,
+              y,
+              box.w,
+              box.h,
+              `Sin evidencia disponible: ${reference}`
+            )
+          }
+        } else {
+          const reason = fetched ? 'formato no compatible' : 'referencia no disponible'
+          drawImagePlaceholder(doc, PAGE_MARGIN, y, box.w, box.h, `Sin evidencia (${reason}): ${reference}`)
+        }
+        y += box.h + 4
       }
     }
   }

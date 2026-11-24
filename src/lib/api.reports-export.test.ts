@@ -58,4 +58,13 @@ describe('reportsApi export contract', () => {
 
     await expect(reportsApi.exportRun('abc')).rejects.toBe(error)
   })
+
+  it('codifica cada segmento de assetPath y el id del reporte', async () => {
+    const { reportsApi } = await import('@/lib/api')
+
+    const url = reportsApi.assetUrl('r/1', 'attachments/captura con espacios & símbolos.png')
+
+    expect(url).toContain('/reports/r%2F1/assets/attachments/')
+    expect(url).toContain('captura%20con%20espacios%20%26%20s%C3%ADmbolos.png')
+  })
 })

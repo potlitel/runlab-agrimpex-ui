@@ -251,7 +251,7 @@ export function ReportDetailSheet({
                                       <img
                                         src={reportsApi.assetUrl(reportId, att.assetPath!)}
                                         alt={att.name || `Evidencia ${idx + 1}`}
-                                        className='h-20 w-28 object-cover'
+                                        className='h-20 w-28 object-contain'
                                         loading='lazy'
                                       />
                                     </a>

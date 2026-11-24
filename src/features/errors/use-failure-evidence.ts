@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { errorsApi, featuresApi } from '@/lib/api'
+import { normalizeEvidenceMetadata } from '@/lib/evidence'
 import { ApiError, type EvidenceItem } from '@/types/contract'
 import { useProfileStore } from '@/stores/profileStore'
 
@@ -38,7 +39,9 @@ export function useFailureEvidence() {
 
   const items = useMemo<EvidenceItem[]>(() => {
     if (!data) return []
-    if (Array.isArray(data.items) && data.items.length >= 0) return data.items
+    if (Array.isArray(data.items) && data.items.length >= 0) {
+      return data.items.map(normalizeEvidenceMetadata)
+    }
     // Compatibilidad con respuestas legacy
     if (Array.isArray(data.images)) {
       return data.images.map((img) => ({

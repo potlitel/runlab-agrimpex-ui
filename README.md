@@ -15,6 +15,7 @@ Frontend del dashboard QA **RunLab Agrimpex** para gestionar perfiles, configura
 - [Ventaja de la imagen Playwright](#ventaja-de-la-imagen-playwright)
 - [Vistas principales](#vistas-principales)
 - [Configuración del proyecto y `playwrightCmd`](#configuración-del-proyecto-y-playwrightcmd)
+- [Evidencia gráfica: defaults, nombres y rollback](#evidencia-gráfica-defaults-nombres-y-rollback)
 
 ## Arquitectura
 
@@ -347,7 +348,22 @@ Campos principales:
   - Si usas `npx playwright test` como base, el comando resultante será incorrecto (duplicará `test`).
 - **Comando Pytest (`pytestCmd`)**: campo **deprecado** mantenido por compatibilidad; para proyectos Playwright usa `playwrightCmd`.
 - Rutas opcionales de datos/evidencias y URL remota de Selenium/Grid según los módulos habilitados.
-- **Evidencias de ejecución (Playwright) (`evidence`)**: permite definir overrides por perfil para `screenshot` (`always`/`only-on-failure`/`off`), `video`, `trace` y `fullPage`. La opción *“Según proyecto (sin override)”* respeta el `playwright.config` del proyecto. Con `screenshot = always` se generan capturas también para tests pasados y el historial puede mostrar una foto por reporte.
+- **Evidencias de ejecución (Playwright) (`evidence`)**: permite definir overrides por perfil para `screenshot` (`always`/`only-on-failure`/`off`), `video`, `trace` y `fullPage`, además de `imageFormat`, `imageQuality` y `scale`. La opción *“Según proyecto (sin override)”* respeta el `playwright.config` del proyecto. Con `screenshot = always` se generan capturas también para tests pasados y el historial puede mostrar una foto por reporte.
+
+### Evidencia gráfica: defaults, nombres y rollback
+
+| Concepto | Contrato |
+|----------|----------|
+| Defaults | `EVIDENCE_DEFAULTS` en `src/types/contract.ts`: `imageFormat: 'png'`, `imageQuality: 90`, `scale: 'css'` y `screenshotTimeout: 30000` ms (este último sin campo en la UI). Un perfil sin esos campos usa los defaults; la calidad solo se aplica a JPEG. |
+| Nombres | El helper del kit produce `screenshot-<paso>` y registra `expected-screenshot`. La UI extrae el paso desde `captureName` (`stepFromCaptureName`) y distingue `capture` de `failure-artifact`; no renombra los archivos. |
+| Acceso | `assetPath` se sirve por `/api/reports/:id/assets/*` (segmentos codificados en `reportsApi.assetUrl`). La galería también lee el manifiesto `.runlab-evidence.json` de la carpeta de evidencias. |
+| Visualización | Miniaturas y visor con `object-contain`, zoom y descarga del original; el PDF calcula el recuadro con dimensiones reales, convierte WebP a PNG y solo muestra placeholder si el asset no existe. |
+| Rollback | Revertir este repo: `src/types/contract.ts`, `src/lib/api.ts`, `src/lib/evidence.ts`, panel de ajustes, galería/visor, detalle de reporte, `report-pdf.ts` y sus tests. Los campos nuevos de la API son opcionales: con la UI anterior los reportes nuevos se leen como evidencia clásica y con la UI actual se leen reportes antiguos. No hay migración de datos. |
+
+Los mismos defaults y contrato de nombres se documentan en
+`../../playwright-kit-profesional/README.md` y
+`../runlab-agrimpex-api/README.md`; los tres repos se despliegan y revierten de
+forma independiente.
 
 ## Estructura relevante del frontend
 

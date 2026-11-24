@@ -342,7 +342,7 @@ function EvidenceCard({ item, onOpen }: { item: EvidenceItem; onOpen: (id: strin
             src={item.url}
             alt={item.displayName || item.name}
             loading='lazy'
-            className='h-full w-full object-cover transition group-hover:scale-[1.02]'
+            className='h-full w-full object-contain transition group-hover:scale-[1.02]'
             onError={() => setBroken(true)}
           />
         ) : item.kind === 'video' ? (
@@ -377,6 +377,13 @@ function EvidenceCard({ item, onOpen }: { item: EvidenceItem; onOpen: (id: strin
         {item.testId && (
           <p className='truncate text-xs text-muted-foreground' title={item.testId}>
             {shortTestId(item.testId)}
+            {item.step ? ` · ${item.step}` : ''}
+          </p>
+        )}
+        {(item.width != null || item.height != null) && (
+          <p className='text-xs text-muted-foreground'>
+            {item.width ?? '?'}×{item.height ?? '?'} px
+            {item.evidenceSource === 'failure-artifact' ? ' · artefacto de fallo' : ''}
           </p>
         )}
         <p className='text-xs text-muted-foreground'>

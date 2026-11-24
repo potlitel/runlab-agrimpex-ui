@@ -76,7 +76,18 @@ export function EvidenceDialog({
               <div className='grid gap-2 rounded-md border bg-muted/20 p-3 text-xs sm:grid-cols-2'>
                 <div><span className='text-muted-foreground'>Fecha:</span> {formatEvidenceDate(item.mtime ?? (item.timestamp ? Date.parse(item.timestamp) : null))}</div>
                 <div><span className='text-muted-foreground'>Tamaño:</span> {formatEvidenceSize(item.size ?? null)}</div>
+                {(item.width != null || item.height != null) && (
+                  <div><span className='text-muted-foreground'>Dimensiones:</span> {item.width ?? '?'}×{item.height ?? '?'} px</div>
+                )}
                 <div className='truncate sm:col-span-2'><span className='text-muted-foreground'>Test:</span> <span className='font-mono' title={item.testId || ''}>{item.testId ? shortEvidenceTestId(item.testId) : '—'}</span></div>
+                {(item.step || item.captureName) && (
+                  <div className='truncate sm:col-span-2'><span className='text-muted-foreground'>Paso:</span> <span className='font-mono'>{item.step || item.captureName}</span></div>
+                )}
+                <div className='truncate sm:col-span-2'>
+                  <span className='text-muted-foreground'>Origen:</span>{' '}
+                  {item.evidenceSource === 'capture' ? 'captura declarada' : item.evidenceSource === 'failure-artifact' ? 'artefacto de fallo' : 'sin clasificar'}
+                  {item.contentType ? ` · ${item.contentType}` : ''}
+                </div>
                 <div className='flex items-center gap-2 sm:col-span-2'>
                   <span className='text-muted-foreground'>Reporte:</span>
                   {item.reportId ? (
@@ -122,8 +133,17 @@ export function EvidenceDialog({
   )
 }
 
+const ZOOM_STEPS = [1, 1.5, 2, 3] as const
+
 export function EvidencePreview({ item }: { item: EvidenceItem }) {
   const [failed, setFailed] = useState(false)
+  const [zoomIndex, setZoomIndex] = useState(0)
+  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null)
+  useEffect(() => {
+    setFailed(false)
+    setNaturalSize(null)
+    setZoomIndex(0)
+  }, [item.id])
   if (item.kind === 'image') {
     if (failed) {
       return (
@@ -133,14 +153,57 @@ export function EvidencePreview({ item }: { item: EvidenceItem }) {
         </div>
       )
     }
+    const zoom = ZOOM_STEPS[zoomIndex]
+    const ratioWidth = item.width || naturalSize?.width
+    const ratioHeight = item.height || naturalSize?.height
     return (
-      <div className='overflow-hidden rounded-md border bg-muted/30'>
-        <img
-          src={item.url}
-          alt={item.displayName || item.name}
-          className='max-h-[60vh] w-full object-contain'
-          onError={() => setFailed(true)}
-        />
+      <div className='space-y-2'>
+        <div className='max-h-[60vh] overflow-auto rounded-md border bg-muted/30'>
+          <img
+            src={item.url}
+            alt={item.displayName || item.name}
+            className='mx-auto block h-auto max-h-[60vh] object-contain'
+            style={{
+              width: `${zoom * 100}%`,
+              maxWidth: 'none',
+              ...(ratioWidth && ratioHeight
+                ? { aspectRatio: `${ratioWidth} / ${ratioHeight}` }
+                : {}),
+            }}
+            onLoad={(e) => {
+              const image = e.currentTarget
+              if (image.naturalWidth && image.naturalHeight) {
+                setNaturalSize({ width: image.naturalWidth, height: image.naturalHeight })
+              }
+            }}
+            onError={() => setFailed(true)}
+          />
+        </div>
+        <div className='flex items-center justify-end gap-2'>
+          <span className='me-auto text-xs text-muted-foreground'>
+            Zoom {Math.round(zoom * 100)}%{item.width != null && item.height != null ? ` · ${item.width}×${item.height} px` : ''}
+          </span>
+          <Button
+            type='button'
+            size='sm'
+            variant='outline'
+            aria-label='Reducir zoom'
+            disabled={zoomIndex === 0}
+            onClick={() => setZoomIndex((i) => Math.max(0, i - 1))}
+          >
+            −
+          </Button>
+          <Button
+            type='button'
+            size='sm'
+            variant='outline'
+            aria-label='Ampliar zoom'
+            disabled={zoomIndex === ZOOM_STEPS.length - 1}
+            onClick={() => setZoomIndex((i) => Math.min(ZOOM_STEPS.length - 1, i + 1))}
+          >
+            +
+          </Button>
+        </div>
       </div>
     )
   }
