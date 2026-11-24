@@ -216,6 +216,13 @@ así que en la mayoría de los casos basta con cambiar esa única variable.
 * El bind mount tiene prioridad sobre `/data/profiles` del volumen: los 5
   perfiles que ya existían en el repo (`perfil-1`, `perfil-qa-test-2`,
   `perfil-1-copia`, `alain`, `jorge`) son los que ve la API.
+* Los avatares **no son ficheros**: `avatar: { style, seed }` vive dentro de
+  cada entrada de `/data/profiles/index.json` (en el host,
+  `../runlab-agrimpex-api/profiles/index.json`). La UI genera el SVG con
+  DiceBear en memoria; no hay `avatar.svg`/PNG ni data URIs en disco, ni
+  llamadas a un servicio externo. Si una entrada antigua no trae avatar, se
+  expone `{ style: 'notionists', seed: <id> }` y se escribe en el índice en la
+  siguiente mutación.
 * `.dockerignore` sigue excluyendo `profiles/` de la **imagen**, pero ahora se
   monta explícitamente desde el host; no se pierde al reconstruir.
 * `docker compose down` conserva todo. `docker compose down -v` borra el

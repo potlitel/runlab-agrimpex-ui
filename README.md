@@ -344,6 +344,13 @@ Cada perfil tiene un avatar **obligatorio** formado por `{ "style": "...", "seed
 - **Edición:** el botón de editar abre un diálogo con nombre y avatar; guarda con `PATCH /api/profile-admin/:id` usando `{ name, avatar }`. Si la API falla, el formulario conserva los valores y se puede reintentar.
 - **Duplicado:** `POST /api/profile-admin/:id/duplicate` envía solo el nombre; el backend hereda el avatar del origen y la UI muestra el devuelto por la API.
 - **Perfiles heredados:** si la respuesta no trae `avatar`, la UI aplica el fallback determinista `{ style: 'notionists', seed: <id> }` en `src/lib/api.ts` y `src/stores/profileStore.ts`. El avatar se muestra en el selector del sidebar, la lista de gestión, Ajustes, el badge del header y `ProfileDropdown`.
+- **Persistencia a nivel de fichero:** el backend guarda `avatar: { style, seed }` dentro de cada entrada de `profiles/index.json` (`/data/profiles/index.json` en Docker, montado desde `../runlab-agrimpex-api/profiles`). No hay SVG/PNG ni data URIs en disco, ni peticiones a un servicio de Gravatar. El detalle está en el apartado "Avatar del perfil" del README de `runlab-agrimpex-api`.
+
+### Cómo se obtiene la imagen
+
+- La UI importa los 4 JSON de estilos de DiceBear (`notionists`, `lorelei`, `micah`, `bottts`) embebidos en el bundle.
+- `avatarToDataUri()` en `src/lib/profile-avatar.ts` construye en memoria un `data:image/svg+xml…` de 128 px usando `style`, `seed` y un color de fondo derivado del propio `seed`.
+- Ese data URI solo vive en el render; nunca se envía ni se guarda. La API valida y persiste únicamente `style` y `seed` (`services/profileManager.js:validateAvatar`, `seed` de 1 a 64 caracteres).
 
 > Este contrato depende del cambio `profile-avatar-persistence` de `runlab-agrimpex-api`: sin él, el alta con avatar es rechazada con `400`.
 
