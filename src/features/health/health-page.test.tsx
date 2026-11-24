@@ -253,6 +253,17 @@ describe('HealthPage', () => {
     expect(screen.queryByTestId('health-sparkline')).toBeNull()
   })
 
+  it('mantiene el skeleton con una sola muestra en caché', () => {
+    health.state.history = [
+      { at: Date.now(), uptimeSeconds: 10, okPercentage: 100 },
+    ]
+
+    render(<HealthPage />)
+
+    expect(screen.getByTestId('health-sparkline-skeleton')).toBeTruthy()
+    expect(screen.queryByTestId('health-sparkline-empty')).toBeNull()
+  })
+
   it('muestra la hora exacta de la última actualización junto al indicador', () => {
     health.state.dataUpdatedAt = new Date(2026, 0, 1, 10, 41, 0).getTime()
 

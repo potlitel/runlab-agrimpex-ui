@@ -307,7 +307,11 @@ export function HealthPage() {
                 <p className='text-xs text-muted-foreground'>
                   Tendencia del tiempo activo
                 </p>
-                <HealthSparkline history={history} isLoading={isLoading} />
+                <HealthSparkline
+                  history={history}
+                  isLoading={isLoading}
+                  isError={isError}
+                />
               </div>
             </CardContent>
           </Card>

@@ -41,11 +41,16 @@ export function HealthChartTooltip({
 export function HealthSparkline({
   history,
   isLoading = false,
+  isError = false,
 }: {
   history: HealthHistoryPoint[]
   isLoading?: boolean
+  isError?: boolean
 }) {
-  if (isLoading) {
+  // Con datos en caché `isLoading` ya es false, pero la tendencia sigue
+  // pendiente hasta acumular dos muestras: mantener el skeleton evita el
+  // salto a «Sin datos» mientras tanto.
+  if (isLoading || (history.length < 2 && !isError)) {
     return (
       <div className='mt-2'>
         <Skeleton data-testid='health-sparkline-skeleton' className='h-32 w-full' />
