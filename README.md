@@ -52,7 +52,7 @@ Workstation B ── agente ─────────────────�
 Workstation C ── agente ───────────────────────────────┘
 ```
 
-El agente ejecuta `check / status / containers / run / stop / start / ensureGrid` localmente y streams los logs por el mismo canal. La API deja de spawnear `docker` y solo enruta por `agentId/profileId` (también en las calendarizaciones con Docker). El perfil pasa a tener un `workstationId` en vez de un `projectPath` que hoy solo existe en el host donde corre la API. Así la frase queda literal: **UI centralizada, Docker de cada workstation, socket nunca sale de la workstation**.
+El agente ejecuta `check / status / containers / run / stop / start / ensureGrid / collect / runTests / abort` localmente y streams los logs por el mismo canal. La API deja de spawnear `docker` y solo enruta por `agentId/profileId` (también en las calendarizaciones con Docker). El perfil pasa a tener un `workstationId` en vez de un `projectPath` que hoy solo existe en el host donde corre la API. Así la frase queda literal: **UI centralizada, Docker de cada workstation, socket nunca sale de la workstation**.
 
 > [!IMPORTANT]
 > ### ¿Quién es el agente?
@@ -144,24 +144,32 @@ curl -H 'X-Profile-Id: <id>' https://dashboard.example.com/api/docker/agents
 
 El panel `/docker` muestra la workstation asignada y si su agente está conectado.
 
-Dos puntos que conviene tener presentes: el agente tiene **root en su workstation** por diseño (el socket no sale de ahí), y la **ejecución de Playwright sigue ocurriendo donde corre la API** — mover también las suites al agente sería el siguiente slice.
+Dos puntos que conviene tener presentes: el agente tiene **root en su workstation** por diseño (el socket no sale de ahí), y las suites se ejecutan **en la workstation asignada al perfil**, no en la API. La API resuelve el entorno y las opciones y se los envía al agente; nunca intenta ejecutar Playwright en el servidor cuando hay `workstationId`.
 
-#### Por qué funciona hoy y cuándo dejaría de funcionar
+#### Prerrequisitos de la workstation y contrato de tests
 
-Hoy `profiles/perfil-1/config.json` tiene `projectPath=/home/potlitel/Trabajo/EICMA/Agrimpex/playwright-kit-profesional` y `docker-compose.yml` monta **ese mismo directorio del host en la misma ruta absoluta** dentro del contenedor de la API. Por eso `npx playwright` (que se lanza con `cwd: projectPath`) y el colector de tests encuentran la suite aunque el proceso corra dentro de Docker; los reportes se escriben en `profiles/<id>/reports`, también montado desde el host.
+Además del token y el ID, la workstation necesita **el kit de Playwright y sus navegadores instalados** (`npx playwright install`, o `npx playwright install --with-deps` en Linux sin librerías del sistema). `projectPath` del perfil debe ser la ruta **absoluta del kit dentro de esa workstation**; la API no necesita acceso a ese directorio.
 
-Esto vale solo mientras la API corra en ese host. Si la API se traslada a un servidor central, ese bind mount es local al servidor: la ruta `/home/potlitel/...` ya no contendrá la suite y `/api/tests/*` fallará **aunque el agente Docker de la workstation esté conectado**. Para centralizar de verdad hay que añadir al agente las operaciones `collect` / `runTests` y devolver el JSON del reporte y los artefactos (screenshots, trace, video, `playwright-report`) a la API central. Hasta entonces no borres `projectPath` del perfil: el agente lo usa como `cwd` para compose y la API lo usa para Playwright.
+El agente atiende tres operaciones nuevas por `agent:command`, todas con el `requestId` de la corrida:
 
-Si quieres volver al modo anterior mientras tanto: `RUNLABQA_DOCKER_TRANSPORT=local` en el `.env` de la API y se recrea el contenedor; el campo `workstationId` se ignora en ese modo.
+| Operación | Comportamiento |
+| --- | --- |
+| `collect` | Ejecuta `playwright test --list --reporter=json` con el `projectPath` y comando recibidos. Devuelve `files`, `total` y `projects`. Si falta Playwright, responde con un error explícito. |
+| `runTests` | Despacho inmediato. Reutiliza el runner con el contexto enviado por la API y reenvía `execution:*`, `test:*`, `progress` y `test:output` como `agent:event` con el `requestId`. Al terminar emite `agent:result` con el manifiesto de artefactos (JSON del reporte, `report.html`, capturas y traces en base64). |
+| `abort` | Cancela la corrida asociada al `requestId` indicado y deja de marcarla como activa. |
 
-#### Evolución prevista: transporte híbrido por perfil
+La API persiste el manifiesto en `profiles/<id>/reports/agent/<runId>` (extensiones permitidas, sin `..`, 10 MB por archivo y 50 MB por corrida) y los reportes siguen consultables por `/api/reports`. Los valores de entorno se redactan tanto en el agente como en el reenvío de eventos.
 
-El estado final es una API y una UI centralizadas que atiendan tanto suites que viven en el servidor como suites que viven en workstations. El criterio debe ser **por perfil**, no global:
+Si el agente del `workstationId` no está registrado, `/api/tests/collect` y `/api/tests/run` responden `503` y **no hay fallback a ejecución local**. Si se desconecta a mitad de corrida, se emite `execution:failed`.
 
-- Perfil **con** `workstationId` → el agente ejecuta Docker y, en el siguiente slice, también `collect` / `runTests`; el servidor solo enruta y recibe el reporte y los artefactos.
-- Perfil **sin** `workstationId` → se mantiene `projectPath` local y la API ejecuta Docker y Playwright en el servidor (equivalente al modo `local` de hoy).
+#### Transporte híbrido por perfil y rollback
 
-Así `projectPath` no desaparece: pasa a ser la ruta válida **en el equipo que ejecuta ese perfil**, y `workstationId` decide en cuál. Hoy `RUNLABQA_DOCKER_TRANSPORT` es un interruptor global; el cambio consiste en hacerlo efectivo por perfil y añadir las operaciones de Playwright al agente.
+El criterio es **por perfil**, no global:
+
+- Perfil **con** `workstationId` → el agente ejecuta Docker y la suite; el grid se levanta en la misma workstation y la API solo enruta y recibe el reporte y los artefactos.
+- Perfil **sin** `workstationId` → se mantiene `projectPath` local y la API ejecuta Docker y Playwright en el servidor (equivalente al modo `local`).
+
+`RUNLABQA_DOCKER_TRANSPORT=local` en el `.env` de la API fuerza el modo legado global para desarrollo y recrea el contenedor; en ese modo el campo `workstationId` se ignora por completo y todas las suites corren en la API. Los artefactos ya transferidos permanecen en el perfil.
 
 ## Requisitos
 
