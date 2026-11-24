@@ -14,6 +14,7 @@ Frontend del dashboard QA **RunLab Agrimpex** para gestionar perfiles, configura
 - [Ejecución con Docker](#ejecución-con-docker)
 - [Ventaja de la imagen Playwright](#ventaja-de-la-imagen-playwright)
 - [Vistas principales](#vistas-principales)
+- [Perfiles y avatares](#perfiles-y-avatares)
 - [Configuración del proyecto y `playwrightCmd`](#configuración-del-proyecto-y-playwrightcmd)
 - [Evidencia gráfica: defaults, nombres y rollback](#evidencia-gráfica-defaults-nombres-y-rollback)
 - [Estado del backend y badge de salud](#estado-del-backend-y-badge-de-salud)
@@ -333,6 +334,18 @@ Las páginas principales mantienen herramientas de navegación/utilidad en el he
 - **Ajustes visuales (rueda dentada)**: tema, layout, sidebar y dirección.
 
 Además, el sidebar incluye el selector de perfil activo y la navegación por secciones.
+
+## Perfiles y avatares
+
+Cada perfil tiene un avatar **obligatorio** formado por `{ "style": "...", "seed": "..." }`. La UI genera el SVG localmente con DiceBear (`@dicebear/core` + `@dicebear/styles`, versiones fijas); el backend solo persiste `style` y `seed`, nunca la imagen.
+
+- **Estilos disponibles:** `notionists`, `lorelei`, `micah`, `bottts`. La galería modal muestra 24 candidatos, permite cambiar de estilo y generar otros; requiere confirmación explícita.
+- **Alta:** tanto "Gestionar perfiles" como Ajustes > Perfiles bloquean "Crear" hasta elegir avatar. Se envía `POST /api/profile-admin` con `{ name, avatar }`.
+- **Edición:** el botón de editar abre un diálogo con nombre y avatar; guarda con `PATCH /api/profile-admin/:id` usando `{ name, avatar }`. Si la API falla, el formulario conserva los valores y se puede reintentar.
+- **Duplicado:** `POST /api/profile-admin/:id/duplicate` envía solo el nombre; el backend hereda el avatar del origen y la UI muestra el devuelto por la API.
+- **Perfiles heredados:** si la respuesta no trae `avatar`, la UI aplica el fallback determinista `{ style: 'notionists', seed: <id> }` en `src/lib/api.ts` y `src/stores/profileStore.ts`. El avatar se muestra en el selector del sidebar, la lista de gestión, Ajustes, el badge del header y `ProfileDropdown`.
+
+> Este contrato depende del cambio `profile-avatar-persistence` de `runlab-agrimpex-api`: sin él, el alta con avatar es rechazada con `400`.
 
 ## Estado del backend y badge de salud
 

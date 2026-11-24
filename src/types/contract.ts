@@ -3,6 +3,10 @@
  * Tipos espejo a mano (sin codegen); todos los payloads de socket incluyen profileId.
  */
 
+import type { ProfileAvatar } from '@/lib/profile-avatar'
+
+export type { AvatarStyleId, ProfileAvatar } from '@/lib/profile-avatar'
+
 // ── Errores ──────────────────────────────────────────────────────────────
 export class ApiError extends Error {
   status: number
@@ -25,6 +29,8 @@ export class ApiError extends Error {
 export interface Profile {
   id: string
   name: string
+  avatar: ProfileAvatar
+  createdAt?: string
   [key: string]: unknown
 }
 

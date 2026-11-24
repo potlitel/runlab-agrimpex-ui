@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, Database, FolderOpen, Loader2, Pencil, Play, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react'
+import { Copy, Database, FolderOpen, Loader2, Pencil, Play, Plus, RefreshCw, Save, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { configApi, profileAdminApi } from '@/lib/api'
+import type { ProfileAvatar as ProfileAvatarValue } from '@/lib/profile-avatar'
 import { profileStore, useProfileStore } from '@/stores/profileStore'
 import type { CreateProfileTestDataMode, Profile } from '@/types/contract'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { ProfileAvatar } from '@/components/profile-avatar'
+import { EditProfileDialog } from '@/features/profile-session/edit-profile-dialog'
+import { ProfileAvatarField } from '@/features/profile-session/profile-avatar-field'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,9 +37,9 @@ export function ProfileAdminSection() {
   const activeProfileId = useProfileStore((s) => s.activeProfileId)
 
   const [newName, setNewName] = useState('')
+  const [newAvatar, setNewAvatar] = useState<ProfileAvatarValue | null>(null)
   const [newDataSource, setNewDataSource] = useState<CreateSource>('global')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null)
 
   const [settingsForm, setSettingsForm] = useState<{
@@ -75,28 +79,20 @@ export function ProfileAdminSection() {
   }
 
   const createMutation = useMutation({
-    mutationFn: ({ name, source }: { name: string; source: CreateSource }) =>
-      profileAdminApi.create(name, source === 'global' ? undefined : { testDataSource: source }),
+    mutationFn: ({ name, source, avatar }: { name: string; source: CreateSource; avatar: ProfileAvatarValue }) =>
+      profileAdminApi.create(name, {
+        avatar,
+        ...(source === 'global' ? {} : { testDataSource: source }),
+      }),
     onSuccess: (profile) => {
       profileStore.getState().add(profile)
       setNewName('')
+      setNewAvatar(null)
       setNewDataSource('global')
       toast.success(`Perfil creado: ${profile.name}`)
       void refresh()
     },
     onError: (error) => toast.error(msg(error, 'No se pudo crear el perfil')),
-  })
-
-  const renameMutation = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) => profileAdminApi.rename(id, name),
-    onSuccess: (_, vars) => {
-      const current = profiles.find((p) => p.id === vars.id)
-      if (current) profileStore.getState().update({ ...current, name: vars.name })
-      setEditingId(null)
-      toast.success('Perfil renombrado')
-      void refresh()
-    },
-    onError: (error) => toast.error(msg(error, 'No se pudo renombrar el perfil')),
   })
 
   const duplicateMutation = useMutation({
@@ -166,13 +162,12 @@ export function ProfileAdminSection() {
 
   function submitCreate() {
     const name = newName.trim()
-    if (!name) return
-    createMutation.mutate({ name, source: newDataSource })
+    if (!name || !newAvatar) return
+    createMutation.mutate({ name, source: newDataSource, avatar: newAvatar })
   }
 
   const busy =
     createMutation.isPending ||
-    renameMutation.isPending ||
     duplicateMutation.isPending ||
     activateMutation.isPending ||
     deleteMutation.isPending ||
@@ -227,10 +222,15 @@ export function ProfileAdminSection() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={submitCreate} disabled={!newName.trim() || createMutation.isPending}>
+              <Button onClick={submitCreate} disabled={!newName.trim() || !newAvatar || createMutation.isPending}>
                 {createMutation.isPending ? <Loader2 className='size-4 animate-spin' /> : <Plus className='size-4' />} Crear
               </Button>
             </div>
+            <ProfileAvatarField
+              name={newName || 'Nuevo perfil'}
+              value={newAvatar}
+              onChange={setNewAvatar}
+            />
             <p className='text-xs text-muted-foreground'>
               Los perfiles duplicados conservan la configuración (incluidas las rutas de datos) del perfil de origen.
             </p>
@@ -244,92 +244,56 @@ export function ProfileAdminSection() {
               {profiles.map((profile) => {
                 const isActive = profile.id === activeProfileId
                 const isTemplate = profile.id === templateProfileId
-                const isEditing = editingId === profile.id
                 return (
                   <div key={profile.id} className='flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center'>
-                    {isEditing ? (
-                      <>
-                        <Input
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className='h-9 flex-1'
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const name = editName.trim()
-                              if (name && name !== profile.name) renameMutation.mutate({ id: profile.id, name })
-                              else setEditingId(null)
-                            }
-                            if (e.key === 'Escape') setEditingId(null)
-                          }}
-                        />
-                        <div className='flex gap-1'>
-                          <Button
-                            size='icon'
-                            variant='ghost'
-                            onClick={() => {
-                              const name = editName.trim()
-                              if (name && name !== profile.name) renameMutation.mutate({ id: profile.id, name })
-                              else setEditingId(null)
-                            }}
-                            disabled={renameMutation.isPending}
-                          >
-                            {renameMutation.isPending ? <Loader2 className='size-4 animate-spin' /> : <Check className='size-4' />}
-                          </Button>
-                          <Button size='icon' variant='ghost' onClick={() => setEditingId(null)}>
-                            <X className='size-4' />
-                          </Button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className='min-w-0 flex-1'>
-                          <div className='flex flex-wrap items-center gap-2'>
-                            <span className='font-medium'>{profile.name}</span>
-                            {isActive && <Badge>Activo</Badge>}
-                            {isTemplate && <Badge variant='secondary'>Plantilla de datos</Badge>}
-                          </div>
-                          <p className='truncate font-mono text-xs text-muted-foreground'>{profile.id}</p>
-                        </div>
-                        <div className='flex flex-wrap gap-1'>
-                          {!isActive && (
-                            <Button
-                              size='sm'
-                              variant='outline'
-                              onClick={() => activateMutation.mutate(profile.id)}
-                              disabled={busy}
-                              title='Activar'
-                            >
-                              {activateMutation.isPending ? <Loader2 className='size-4 animate-spin' /> : <Play className='size-4' />} Activar
-                            </Button>
-                          )}
-                          <Button
-                            size='icon'
-                            variant='ghost'
-                            title='Renombrar'
-                            onClick={() => {
-                              setEditingId(profile.id)
-                              setEditName(profile.name)
-                            }}
-                            disabled={busy}
-                          >
-                            <Pencil className='size-4' />
-                          </Button>
-                          <Button
-                            size='icon'
-                            variant='ghost'
-                            title='Duplicar'
-                            onClick={() => duplicateMutation.mutate({ id: profile.id, name: `${profile.name} (copia)` })}
-                            disabled={busy}
-                          >
-                            {duplicateMutation.isPending ? <Loader2 className='size-4 animate-spin' /> : <Copy className='size-4' />}
-                          </Button>
-                          <Button size='icon' variant='ghost' title='Eliminar' onClick={() => setDeleteTarget(profile)} disabled={busy}>
-                            <Trash2 className='size-4' />
-                          </Button>
-                        </div>
-                      </>
-                    )}
+                    <ProfileAvatar
+                      name={profile.name}
+                      avatar={profile.avatar}
+                      profileId={profile.id}
+                      className='size-9'
+                    />
+                    <div className='min-w-0 flex-1'>
+                      <div className='flex flex-wrap items-center gap-2'>
+                        <span className='font-medium'>{profile.name}</span>
+                        {isActive && <Badge>Activo</Badge>}
+                        {isTemplate && <Badge variant='secondary'>Plantilla de datos</Badge>}
+                      </div>
+                      <p className='truncate font-mono text-xs text-muted-foreground'>{profile.id}</p>
+                    </div>
+                    <div className='flex flex-wrap gap-1'>
+                      {!isActive && (
+                        <Button
+                          size='sm'
+                          variant='outline'
+                          onClick={() => activateMutation.mutate(profile.id)}
+                          disabled={busy}
+                          title='Activar'
+                        >
+                          {activateMutation.isPending ? <Loader2 className='size-4 animate-spin' /> : <Play className='size-4' />} Activar
+                        </Button>
+                      )}
+                      <Button
+                        size='icon'
+                        variant='ghost'
+                        title='Editar'
+                        onClick={() => setEditingProfile(profile)}
+                        disabled={busy}
+                      >
+                        <Pencil className='size-4' />
+                      </Button>
+                      <Button
+                        size='icon'
+                        variant='ghost'
+                        title='Duplicar'
+                        onClick={() => duplicateMutation.mutate({ id: profile.id, name: `${profile.name} (copia)` })}
+                        disabled={busy}
+                      >
+                        {duplicateMutation.isPending ? <Loader2 className='size-4 animate-spin' /> : <Copy className='size-4' />}
+                      </Button>
+                      <Button size='icon' variant='ghost' title='Eliminar' onClick={() => setDeleteTarget(profile)} disabled={busy}>
+                        <Trash2 className='size-4' />
+                      </Button>
+                    </div>
                   </div>
                 )
               })}
@@ -457,6 +421,16 @@ export function ProfileAdminSection() {
           </div>
         </CardContent>
       </Card>
+
+      {editingProfile ? (
+        <EditProfileDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) setEditingProfile(null)
+          }}
+          profile={editingProfile}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={!!deleteTarget}

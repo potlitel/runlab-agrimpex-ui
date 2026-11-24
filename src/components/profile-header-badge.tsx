@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { FolderOpen, User } from 'lucide-react'
+import { FolderOpen } from 'lucide-react'
 import { configApi } from '@/lib/api'
 import { useProfileStore } from '@/stores/profileStore'
 import { Badge } from '@/components/ui/badge'
+import { ProfileAvatar } from '@/components/profile-avatar'
 
 type Props = {
   profileName?: string
@@ -36,7 +37,12 @@ export function ProfileHeaderBadge({ profileName }: Props) {
       title={title}
     >
       <span className='flex w-full min-w-0 items-center gap-1.5'>
-        <User className='size-3.5 shrink-0 opacity-80' />
+        <ProfileAvatar
+          name={resolvedName ?? 'Sin perfil activo'}
+          avatar={activeProfile?.avatar}
+          profileId={activeProfile?.id}
+          className='size-5'
+        />
         <span className='truncate'>{resolvedName ?? 'Sin perfil activo'}</span>
       </span>
       {projectPath ? (

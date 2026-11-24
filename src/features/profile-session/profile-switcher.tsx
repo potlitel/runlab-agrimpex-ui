@@ -1,13 +1,8 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  Check,
-  ChevronsUpDown,
-  Loader2,
-  Settings2,
-  UserRound,
-} from 'lucide-react'
+import { Check, ChevronsUpDown, Loader2, Settings2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ProfileAvatar } from '@/components/profile-avatar'
 import { profileAdminApi } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { profileStore, useProfileStore } from '@/stores/profileStore'
@@ -71,9 +66,12 @@ export function ProfileSwitcher() {
                 size='lg'
                 className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
               >
-                <div className='flex aspect-square size-8 items-center justify-center rounded-lg border bg-background text-muted-foreground'>
-                  <UserRound className='size-4' />
-                </div>
+                <ProfileAvatar
+                  name={activeProfile?.name ?? 'Sin perfil'}
+                  avatar={activeProfile?.avatar}
+                  profileId={activeProfile?.id}
+                  className='size-8 rounded-lg'
+                />
                 <div className='grid flex-1 text-start text-sm leading-tight'>
                   <span className='truncate font-semibold'>
                     {loading && !activeProfile
@@ -125,6 +123,12 @@ export function ProfileSwitcher() {
                     disabled={!!activating}
                     className='gap-2 p-2'
                   >
+                    <ProfileAvatar
+                      name={profile.name}
+                      avatar={profile.avatar}
+                      profileId={profile.id}
+                      className='size-6'
+                    />
                     <span
                       className={cn(
                         'size-2 shrink-0 rounded-full',

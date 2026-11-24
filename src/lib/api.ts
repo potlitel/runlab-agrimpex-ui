@@ -3,6 +3,7 @@ import axios, {
   type AxiosInstance,
   type AxiosResponse,
 } from 'axios'
+import { normalizeProfileAvatar, type ProfileAvatar } from '@/lib/profile-avatar'
 import { profileStore } from '@/stores/profileStore'
 import {
   ApiError,
@@ -273,22 +274,38 @@ export const jsonDataApi = {
 }
 
 // ── Profile admin (gestión de perfiles del dashboard) ────────────────────
+function normalizeProfile(profile: Profile): Profile {
+  return { ...profile, avatar: normalizeProfileAvatar(profile.avatar, profile.id) }
+}
+
+function normalizeProfileList(response: ProfileAdminListResponse): ProfileAdminListResponse {
+  return { ...response, profiles: (response.profiles ?? []).map(normalizeProfile) }
+}
+
 export const profileAdminApi = {
-  list: () => get<ProfileAdminListResponse>('/profile-admin'),
-  get: () => get<ProfileAdminListResponse>('/profile-admin'),
-  create: (name: string, options?: { testDataSource?: 'defaults' | 'template' | 'active' | 'none' }) =>
-    post<Profile>('/profile-admin', { name, ...(options ?? {}) }),
+  list: () => get<ProfileAdminListResponse>('/profile-admin').then(normalizeProfileList),
+  get: () => get<ProfileAdminListResponse>('/profile-admin').then(normalizeProfileList),
+  create: (
+    name: string,
+    options: {
+      avatar: ProfileAvatar
+      testDataSource?: 'defaults' | 'template' | 'active' | 'none'
+    }
+  ) => post<Profile>('/profile-admin', { name, ...options }).then(normalizeProfile),
   updateSettings: (payload: {
     templateProfileId?: string | null
     testDataDefaults?: { txtFolderPath?: string; jsonDataPath?: string }
     createProfileTestDataMode?: 'defaults' | 'template' | 'active' | 'none'
-  }) => patch<ProfileAdminListResponse>('/profile-admin/settings', payload),
+  }) => patch<ProfileAdminListResponse>('/profile-admin/settings', payload).then(normalizeProfileList),
   rename: (id: string, name: string) =>
     patch<{ success: boolean }>(`/profile-admin/${encodeURIComponent(id)}/rename`, { name }),
-  update: (id: string, name: string) =>
-    patch<{ success: boolean }>(`/profile-admin/${encodeURIComponent(id)}/rename`, { name }),
-  duplicate: (id: string, name: string) =>
-    post<Profile>(`/profile-admin/${encodeURIComponent(id)}/duplicate`, { name }),
+  update: (id: string, patchData: { name?: string; avatar?: ProfileAvatar }) =>
+    patch<Profile>(`/profile-admin/${encodeURIComponent(id)}`, patchData).then(normalizeProfile),
+  duplicate: (id: string, name: string, avatar?: ProfileAvatar) =>
+    post<Profile>(`/profile-admin/${encodeURIComponent(id)}/duplicate`, {
+      name,
+      ...(avatar ? { avatar } : {}),
+    }).then(normalizeProfile),
   activate: (id: string) =>
     patch<{ success: boolean; activeProfileId: string }>(
       `/profile-admin/${encodeURIComponent(id)}/activate`

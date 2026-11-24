@@ -1,5 +1,10 @@
 import { create } from 'zustand'
+import { normalizeProfileAvatar } from '@/lib/profile-avatar'
 import type { Profile, ProfilesStatusItem } from '@/types/contract'
+
+function withNormalizedAvatar(profile: Profile): Profile {
+  return { ...profile, avatar: normalizeProfileAvatar(profile.avatar, profile.id) }
+}
 
 interface ProfileState {
   activeProfileId: string | null
@@ -37,14 +42,15 @@ export const profileStore = create<ProfileState>((set) => ({
       if (!activeProfileId && profiles.length > 0) {
         activeProfileId = profiles[0].id
       }
-      return { profiles, activeProfileId }
+      return { profiles: profiles.map(withNormalizedAvatar), activeProfileId }
     }),
   add: (profile) =>
     set((state) => {
-      const exists = state.profiles.some((p) => p.id === profile.id)
+      const normalized = withNormalizedAvatar(profile)
+      const exists = state.profiles.some((p) => p.id === normalized.id)
       const profiles = exists
-        ? state.profiles.map((p) => (p.id === profile.id ? profile : p))
-        : [...state.profiles, profile]
+        ? state.profiles.map((p) => (p.id === normalized.id ? normalized : p))
+        : [...state.profiles, normalized]
       return {
         profiles,
         activeProfileId: state.activeProfileId ?? profile.id,
@@ -53,7 +59,9 @@ export const profileStore = create<ProfileState>((set) => ({
   update: (profile) =>
     set((state) => ({
       profiles: state.profiles.map((p) =>
-        p.id === profile.id ? { ...p, ...profile } : p
+        p.id === profile.id
+          ? withNormalizedAvatar({ ...p, ...profile, avatar: profile.avatar ?? p.avatar })
+          : p
       ),
     })),
   remove: (id) =>
