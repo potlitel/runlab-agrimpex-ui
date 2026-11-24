@@ -489,6 +489,8 @@ docker run -d --name runlabqa-ui -p 3002:3000 runlabqa-agrimpex-ui
 
 Ver [guía completa de onboarding Docker](docs/ONBOARDING_DOCKER.md).
 
+> 🧭 **Nuevo en el proyecto?** Empezá por la [guía express de configuración central y runtime](docs/ONBOARDING_DOCKER.md#13-guía-express-para-nuevos-desarrolladores-central-env-editor): incluye un diagrama Mermaid del flujo completo, la receta para cambiar el hostname sin rebuild y los errores típicos (`503`, `401`, banner de degradación, «pendiente de aplicar»).
+
 ### 6) Publicar cambios de código: rebuild + recreate
 
 Cuando cambia el código (no solo `.env`), reconstruye las imágenes y fuerza el recreado de los contenedores para que usen los nuevos layers:
