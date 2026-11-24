@@ -1,4 +1,6 @@
-import { Activity, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link } from '@tanstack/react-router'
+import { Activity, ChevronDown, RefreshCw, Settings2, Timer } from 'lucide-react'
 import { Header } from '@/components/layout/header'
 import { HeaderTools } from '@/components/layout/header-tools'
 import { Main } from '@/components/layout/main'
@@ -11,74 +13,40 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { useHealth } from '@/hooks/use-health'
-import type {
-  HealthBadgeStatus,
-  HealthCheck,
-  HealthCheckStatus,
-} from '@/types/contract'
-
-const STATUS_LABELS: Record<HealthBadgeStatus, string> = {
-  ok: 'OK',
-  degraded: 'Degradado',
-  unhealthy: 'Sin conexión',
-  offline: 'Sin conexión',
-}
-
-const STATUS_VARIANTS: Record<
-  HealthBadgeStatus,
-  'outline' | 'secondary' | 'destructive'
-> = {
-  ok: 'outline',
-  degraded: 'secondary',
-  unhealthy: 'destructive',
-  offline: 'destructive',
-}
-
-const CHECK_STATUS_LABELS: Record<HealthCheckStatus, string> = {
-  ok: 'OK',
-  degraded: 'Degradado',
-  unhealthy: 'Crítico',
-  not_configured: 'Sin configurar',
-}
-
-const CHECK_STATUS_VARIANTS: Record<
-  HealthCheckStatus,
-  'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-  ok: 'default',
-  degraded: 'secondary',
-  unhealthy: 'destructive',
-  not_configured: 'outline',
-}
-
-const CHECK_NAMES: Record<string, string> = {
-  profiles: 'Perfiles',
-  reports: 'Reportes',
-  evidenceGallery: 'Galería de evidencias',
-  profile: 'Perfil activo',
-  projectPath: 'Ruta del proyecto',
-  playwrightKit: 'Kit Playwright',
-  scheduler: 'Programador',
-  socket: 'Socket.io',
-  dockerGrid: 'Docker / Grid',
-}
-
-function formatUptime(seconds?: number) {
-  if (typeof seconds !== 'number') return '—'
-  const minutes = Math.floor(seconds / 60)
-  const rest = seconds % 60
-  return minutes ? `${minutes} min ${rest} s` : `${rest} s`
-}
+import type { HealthCheck } from '@/types/contract'
+import { HealthGauge, HealthSparkline } from './health-charts'
+import {
+  CHECK_BADGE_CLASSES,
+  CHECK_ICONS,
+  CHECK_NAMES,
+  CHECK_STATUS_LABELS,
+  DEFAULT_CHECK_ICON,
+  STATUS_BADGE_CLASSES,
+  STATUS_LABELS,
+  formatRelativeTime,
+  formatUptime,
+  sanitizeCheckMessage,
+  secondsUntilNextPoll,
+} from './health-utils'
 
 function CheckList({
   title,
   description,
   checks,
+  checkedAt,
+  now,
 }: {
   title: string
   description: string
   checks: HealthCheck[]
+  checkedAt: number | undefined
+  now: number
 }) {
   return (
     <Card>
@@ -93,24 +61,73 @@ function CheckList({
           </p>
         ) : (
           <ul className='space-y-2'>
-            {checks.map((item) => (
-              <li
-                key={item.id}
-                className='flex items-start justify-between gap-3 rounded-md border px-3 py-2'
-              >
-                <div className='min-w-0'>
-                  <p className='text-sm font-medium'>
-                    {CHECK_NAMES[item.id] ?? item.id}
-                  </p>
-                  {item.message ? (
-                    <p className='text-xs text-muted-foreground'>{item.message}</p>
+            {checks.map((item) => {
+              const Icon = CHECK_ICONS[item.id] ?? DEFAULT_CHECK_ICON
+              const name = CHECK_NAMES[item.id] ?? item.id
+              const statusLabel = CHECK_STATUS_LABELS[item.status]
+              const message = sanitizeCheckMessage(item.message, item.status)
+
+              return (
+                <li
+                  key={item.id}
+                  data-testid={`check-${item.id}`}
+                  className='rounded-md border px-3 py-2'
+                >
+                  <div className='flex items-start justify-between gap-3'>
+                    <div className='flex min-w-0 items-start gap-2'>
+                      <Icon
+                        aria-hidden='true'
+                        data-testid={`check-icon-${item.id}`}
+                        className='mt-0.5 size-4 shrink-0 text-muted-foreground'
+                      />
+                      <div className='min-w-0'>
+                        <p className='text-sm font-medium'>{name}</p>
+                        <p className='text-xs text-muted-foreground'>
+                          {formatRelativeTime(checkedAt, now)}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      className={CHECK_BADGE_CLASSES[item.status]}
+                      aria-label={`Estado de ${name}: ${statusLabel}`}
+                    >
+                      {statusLabel}
+                    </Badge>
+                  </div>
+
+                  {message ? (
+                    <Collapsible className='mt-2'>
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          className='h-6 gap-1 px-2 text-xs'
+                        >
+                          <ChevronDown className='size-3.5' /> Ver detalle
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <p
+                          data-testid={`check-detail-${item.id}`}
+                          className='rounded-md bg-muted/50 px-2 py-1.5 text-xs text-muted-foreground'
+                        >
+                          {message}
+                        </p>
+                      </CollapsibleContent>
+                    </Collapsible>
                   ) : null}
-                </div>
-                <Badge variant={CHECK_STATUS_VARIANTS[item.status]}>
-                  {CHECK_STATUS_LABELS[item.status]}
-                </Badge>
-              </li>
-            ))}
+
+                  {item.status === 'not_configured' ? (
+                    <Link
+                      to='/settings'
+                      className='mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary underline'
+                    >
+                      <Settings2 className='size-3' /> Configurar ahora
+                    </Link>
+                  ) : null}
+                </li>
+              )
+            })}
           </ul>
         )}
       </CardContent>
@@ -120,8 +137,28 @@ function CheckList({
 
 /** Vista dedicada al estado del backend; informativa y nunca bloqueante. */
 export function HealthPage() {
-  const { status, failedChecks, data, isError, refresh } = useHealth()
+  const {
+    status,
+    failedChecks,
+    data,
+    isError,
+    isFetching,
+    dataUpdatedAt,
+    history,
+    healthPercentage,
+    refresh,
+  } = useHealth()
   const label = STATUS_LABELS[status]
+
+  // Un único reloj de UI para textos relativos y cuenta regresiva; el sondeo
+  // real sigue siendo el de React Query (30 s), no se duplica aquí.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const remainingSeconds = secondsUntilNextPoll(dataUpdatedAt, now)
 
   return (
     <>
@@ -139,6 +176,20 @@ export function HealthPage() {
             </div>
           </div>
           <div className='ms-auto flex items-center gap-2'>
+            {isFetching ? (
+              <span
+                data-testid='health-refresh-pulse'
+                aria-label='Refrescando estado'
+                className='size-2 animate-pulse rounded-full bg-emerald-500'
+              />
+            ) : null}
+            <span
+              data-testid='health-countdown'
+              aria-label={`Próximo sondeo en ${remainingSeconds} segundos`}
+              className='inline-flex items-center gap-1 text-xs text-muted-foreground'
+            >
+              <Timer className='size-3.5' /> {remainingSeconds} s
+            </span>
             <Button size='sm' variant='outline' onClick={refresh}>
               <RefreshCw className='size-4' /> Actualizar
             </Button>
@@ -157,13 +208,16 @@ export function HealthPage() {
                     Sondeo automático cada 30 s sobre /api/health/detail
                   </CardDescription>
                 </div>
-                <Badge
-                  variant={STATUS_VARIANTS[status]}
-                  className='text-sm'
-                  aria-label={`Estado del backend: ${label}`}
-                >
-                  {label}
-                </Badge>
+                <div className='flex items-center gap-3'>
+                  <HealthGauge value={healthPercentage} />
+                  <Badge
+                    variant='outline'
+                    className={`text-sm ${STATUS_BADGE_CLASSES[status]}`}
+                    aria-label={`Estado del backend: ${label}`}
+                  >
+                    {label}
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -192,6 +246,12 @@ export function HealthPage() {
                   </dd>
                 </div>
               </dl>
+              <div className='mt-4'>
+                <p className='text-xs text-muted-foreground'>
+                  Tendencia del tiempo activo
+                </p>
+                <HealthSparkline history={history} />
+              </div>
             </CardContent>
           </Card>
 
@@ -200,11 +260,15 @@ export function HealthPage() {
               title='Checks críticos'
               description='Si fallan, la API responde 503 y el contenedor se marca unhealthy.'
               checks={data?.checks.critical ?? []}
+              checkedAt={dataUpdatedAt}
+              now={now}
             />
             <CheckList
               title='Checks informativos'
               description='Avisan de configuración incompleta sin detener el servicio ni bloquear vistas.'
               checks={data?.checks.informational ?? []}
+              checkedAt={dataUpdatedAt}
+              now={now}
             />
           </div>
         </div>

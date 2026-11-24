@@ -599,6 +599,13 @@ export interface HealthDetail {
   failedChecks: string[]
 }
 
+/** Muestra en memoria de respuestas de salud ya recibidas; no llega de la API. */
+export interface HealthHistoryPoint {
+  at: number
+  uptimeSeconds: number
+  okPercentage: number
+}
+
 // ── Payloads Socket.io (todos con profileId salvo profiles:status global) ─
 export interface SocketProfilePayload {
   profileId: string

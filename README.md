@@ -366,7 +366,15 @@ Cuando el estado no es `ok`, aparece el botón de reintento: llama a `refresh()`
 
 La ruta `/health` (visible en **Sistema > Salud**) reutiliza `useHealth` para mostrar el mismo estado del header con detalle: estado general, tiempo activo, `failedChecks` y dos listados con los checks **críticos** e **informativos**, sus mensajes genéricos y su estado (`OK`, `Degradado`, `Crítico`, `Sin configurar`). El botón **Actualizar** dispara el mismo `refresh()` que la badge, sin recargar la página.
 
-En caso de desconexión se muestra un aviso, pero las vistas y las queries siguen funcionando: la página es informativa y no introduce ninguna compuerta. El intervalo de sondeo sigue siendo el mismo que el de la badge (30 s).
+La vista incorpora varias ayudas visuales, todas derivadas de la respuesta ya consultada:
+
+- **Iconos y badges semánticos**: cada check lleva un icono Lucide propio (perfiles, reportes, galería, ruta, Docker, etc.) y un badge verde para `OK`, ámbar para `Sin configurar` y rojo para fallos. El color siempre se acompaña de su etiqueta textual.
+- **Tendencia y salud agregada**: un sparkline de área muestra el historial del tiempo activo de las últimas respuestas y un indicador radial el porcentaje de checks correctos. El historial vive en memoria; al recargar se muestra «Sin datos» hasta acumular dos muestras. No hay endpoint nuevo ni llamadas API adicionales.
+- **Frescura del sondeo**: una cuenta regresiva indica cuándo llega el próximo sondeo (30 s) y un punto parpadeante aparece solo mientras la consulta está en curso. Ambos se derivan de `dataUpdatedAt` e `isFetching` de la misma query; no existe un segundo intervalo.
+- **Detalle por check**: cada fila muestra el tiempo relativo desde la última verificación («Hace 5 s») y un panel expandible **Ver detalle** con el mensaje sanitizado. La vista nunca muestra stack traces, rutas del sistema de archivos, tokens ni valores de entorno.
+- **Acción rápida**: los checks `not_configured` incluyen un enlace **Configurar ahora** que abre **Ajustes** (`/settings`) sin abandonar la sesión del perfil activo.
+
+En caso de desconexión se muestra un aviso, pero las vistas y las queries siguen funcionando: la página es informativa y no introduce ninguna compuerta. El aviso, los gráficos vacíos y la cuenta regresiva conviven con la estructura de la página. El intervalo de sondeo sigue siendo el mismo que el de la badge (30 s).
 
 ### Rollback
 

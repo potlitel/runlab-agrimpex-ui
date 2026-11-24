@@ -45,6 +45,31 @@ describe('useHealth', () => {
     await waitFor(() => expect(healthDetail).toHaveBeenCalledTimes(2))
   })
 
+  it('expone frescura, porcentaje e historial derivado de las respuestas', async () => {
+    healthDetail.mockResolvedValue({
+      status: 'degraded',
+      uptimeSeconds: 42,
+      checks: {
+        critical: [{ id: 'profiles', status: 'ok' }],
+        informational: [{ id: 'dockerGrid', status: 'not_configured' }],
+      },
+      failedChecks: [],
+    })
+    const { useHealth } = await import('./use-health')
+    const { result } = renderHook(() => useHealth(), { wrapper: makeWrapper() })
+
+    await waitFor(() => expect(result.current.history).toHaveLength(1))
+    expect(result.current.healthPercentage).toBe(50)
+    expect(result.current.dataUpdatedAt).toBeGreaterThan(0)
+    expect(typeof result.current.isFetching).toBe('boolean')
+    expect(result.current.history[0].uptimeSeconds).toBe(42)
+
+    act(() => {
+      result.current.refresh()
+    })
+    await waitFor(() => expect(result.current.history).toHaveLength(2))
+  })
+
   it('un error no lanza excepción ni bloquea otras queries', async () => {
     healthDetail.mockRejectedValue(new Error('API inalcanzable'))
     const otherQuery = vi.fn().mockResolvedValue({ ok: true })
