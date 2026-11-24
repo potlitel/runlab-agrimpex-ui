@@ -101,7 +101,7 @@ export function EvidenceDialog({
                 </div>
               </div>
 
-              <EvidencePreview item={item} />
+              <EvidencePreview key={item.id} item={item} />
 
               <div className='flex flex-wrap items-center justify-between gap-2'>
                 <div className='flex items-center gap-2'>
@@ -139,11 +139,6 @@ export function EvidencePreview({ item }: { item: EvidenceItem }) {
   const [failed, setFailed] = useState(false)
   const [zoomIndex, setZoomIndex] = useState(0)
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null)
-  useEffect(() => {
-    setFailed(false)
-    setNaturalSize(null)
-    setZoomIndex(0)
-  }, [item.id])
   if (item.kind === 'image') {
     if (failed) {
       return (

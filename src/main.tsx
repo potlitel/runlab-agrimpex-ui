@@ -9,8 +9,10 @@ import {
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { handleServerError } from '@/lib/handle-server-error'
+import { loadRuntimeConfig } from '@/lib/runtime-config'
 import { ProfileSessionProvider } from '@/features/profile-session/profile-session-provider'
 import { DirectionProvider } from './context/direction-provider'
+import { RuntimeConfigBanner, RuntimeConfigProvider } from './context/runtime-config-context'
 import { FontProvider } from './context/font-provider'
 import { ThemeProvider } from './context/theme-provider'
 import { routeTree } from './routeTree.gen'
@@ -75,20 +77,27 @@ declare module '@tanstack/react-router' {
 
 const rootElement = document.getElementById('root')!
 if (!rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement)
-  root.render(
-    <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <FontProvider>
-            <DirectionProvider>
-              <ProfileSessionProvider>
-                <RouterProvider router={router} />
-              </ProfileSessionProvider>
-            </DirectionProvider>
-          </FontProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
-    </StrictMode>
-  )
+  // Las URLs de API/socket se aplican antes de crear axios, el socket y el
+  // primer render: cambiar el hostname desde Ajustes > Stack no exige rebuild.
+  void loadRuntimeConfig().then((runtimeConfig) => {
+    const root = ReactDOM.createRoot(rootElement)
+    root.render(
+      <StrictMode>
+        <RuntimeConfigProvider value={runtimeConfig}>
+          <RuntimeConfigBanner />
+          <QueryClientProvider client={queryClient}>
+            <ThemeProvider>
+              <FontProvider>
+                <DirectionProvider>
+                  <ProfileSessionProvider>
+                    <RouterProvider router={router} />
+                  </ProfileSessionProvider>
+                </DirectionProvider>
+              </FontProvider>
+            </ThemeProvider>
+          </QueryClientProvider>
+        </RuntimeConfigProvider>
+      </StrictMode>
+    )
+  })
 }

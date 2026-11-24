@@ -77,6 +77,7 @@ function DockerPageView({ profileName }: { profileName?: string }) {
           <div className='space-y-4'>
             <div className='grid gap-4 xl:grid-cols-2'>
               <DockerStatusPanel
+                agentConnection={docker.agentConnection}
                 check={docker.check}
                 checkLoading={docker.checkLoading}
                 checkError={docker.checkError}

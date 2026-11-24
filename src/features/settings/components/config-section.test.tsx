@@ -130,3 +130,38 @@ describe('ConfigSection — opciones de evidencia', () => {
     ).toContain(String(EVIDENCE_DEFAULTS.imageQuality))
   })
 })
+
+describe('ConfigSection — workstationId', () => {
+  it('genera un ID de agente válido y lo persiste al guardar', async () => {
+    const savedRef: { config?: Config } = {}
+    render(
+      <ConfigSection
+        settings={makeSettings({ projectPath: '/proyecto' }, (payload) => {
+          savedRef.config = payload
+        })}
+      />,
+    )
+
+    const input = screen.getByLabelText('ID del agente Docker') as HTMLInputElement
+    expect(input.value).toBe('')
+
+    fireEvent.click(screen.getByRole('button', { name: /Generar ID/ }))
+    expect(input.value).toMatch(/^ws-[0-9a-f]{6}$/)
+    expect(input.value).toMatch(/^[A-Za-z0-9._-]{1,64}$/)
+
+    fireEvent.click(screen.getByRole('button', { name: /Guardar configuración/ }))
+    await vi.waitFor(() => expect(savedRef.config?.workstationId).toBe(input.value))
+  })
+
+  it('genera un ID nuevo en cada pulsación', () => {
+    render(<ConfigSection settings={makeSettings({}, vi.fn())} />)
+    const input = screen.getByLabelText('ID del agente Docker') as HTMLInputElement
+    const button = screen.getByRole('button', { name: /Generar ID/ })
+
+    fireEvent.click(button)
+    const first = input.value
+    fireEvent.click(button)
+    expect(input.value).not.toBe(first)
+    expect(input.value).toMatch(/^ws-[0-9a-f]{6}$/)
+  })
+})

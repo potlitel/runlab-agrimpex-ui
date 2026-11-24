@@ -15,6 +15,14 @@
 #  Documentación completa:
 #    "RunLab Agrimpex — Orquestación Docker.md" y docs/ONBOARDING_DOCKER.md
 #
+#  Configuración central del stack (Ajustes > Stack):
+#    1. Define UPDATE_TOKEN en .env y recrea la API: habilita el gate.
+#    2. La API edita este .env (allowlist) y escribe public/public-config.json.
+#       La UI lo sirve en /public-config.json y lo lee en runtime: cambiar
+#       VITE_API_URL / VITE_SOCKET_URL no requiere reconstruir el bundle.
+#    3. Cambios de token, transporte, puertos o rutas requieren recrear el
+#       contenedor indicado; la UI muestra el comando exacto, no lo ejecuta.
+#
 #  Puertos por defecto:
 #    API  -> http://localhost:3001  (Swagger: /api/docs/)
 #    UI   -> http://localhost:3002
@@ -55,6 +63,9 @@ services:
       # Docker se ejecuta en la workstation del perfil, nunca en este host.
       RUNLABQA_DOCKER_TRANSPORT: ${RUNLABQA_DOCKER_TRANSPORT:-agent}
       RUNLABQA_AGENT_TOKEN: ${RUNLABQA_AGENT_TOKEN:-}
+      # Unico directorio que el módulo de configuración del stack puede tocar.
+      RUNLABQA_STACK_ENV_DIR: /stack-env
+      RUNLABQA_PUBLIC_CONFIG_PATH: /stack-env/public/public-config.json
     ports:
       - "${API_PORT:-3001}:3001"
     volumes:
@@ -70,6 +81,10 @@ services:
       # Cambia PLAYWRIGHT_KIT_DIR en .env si el kit está en otro sitio.
       # Sin :ro porque las corridas escriben test-results/playwright-report/.
       - ${PLAYWRIGHT_KIT_DIR:-/home/potlitel/Trabajo/EICMA/Agrimpex/playwright-kit-profesional}:${PLAYWRIGHT_KIT_DIR:-/home/potlitel/Trabajo/EICMA/Agrimpex/playwright-kit-profesional}
+      # --- Directorio del .env central (lectura y escritura controladas) ---
+      # No se monta solo el archivo: rename sobre un bind mount de archivo no
+      # da atomicidad. backups -> /data/config-backups, nunca este repo.
+      - ${RUNLABQA_STACK_DIR:-.}:/stack-env
       # --- Opcional: módulo /api/docker (daemon del host) ---
       # - /var/run/docker.sock:/var/run/docker.sock
       # - /usr/bin/docker:/usr/bin/docker:ro
@@ -99,6 +114,11 @@ services:
     depends_on:
       runlabqa-api:
         condition: service_healthy
+    volumes:
+      # El mismo archivo que escribe la API, servido por `serve` como
+      # /public-config.json. Se monta el archivo (no el directorio) para que
+      # las escrituras en sitio se vean sin recrear la UI.
+      - ${RUNLABQA_PUBLIC_CONFIG_FILE:-./public/public-config.json}:/app/dist/public-config.json:ro
     networks:
       - runlabqa-network
 

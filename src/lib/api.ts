@@ -1,6 +1,7 @@
 import axios, {
   type AxiosError,
   type AxiosInstance,
+  type AxiosRequestConfig,
   type AxiosResponse,
 } from 'axios'
 import { normalizeProfileAvatar, type ProfileAvatar } from '@/lib/profile-avatar'
@@ -39,6 +40,9 @@ import {
   type Schedule,
   type ScheduleResponse,
   type SchedulesResponse,
+  type PublicConfig,
+  type StackConfigResponse,
+  type StackConfigSavePayload,
   type SystemUpdate,
   type TestFileResponse,
   type TestRunRequest,
@@ -48,14 +52,27 @@ import {
   type TxtData,
 } from '@/types/contract'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+// Valor horneado: se usa hasta que el bootstrap aplica la configuración
+// pública servida en runtime (Ajustes > Stack permite cambiarla sin rebuild).
+export const API_BASE_FALLBACK = import.meta.env.VITE_API_URL || '/api'
+
+let apiBaseUrl = API_BASE_FALLBACK
 
 export const api: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: apiBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },
 })
+
+export function configureApiBaseUrl(url?: string): void {
+  apiBaseUrl = url || API_BASE_FALLBACK
+  if (api.defaults) api.defaults.baseURL = apiBaseUrl
+}
+
+export function getApiBaseUrl(): string {
+  return apiBaseUrl
+}
 
 // Request: inyecta perfil activo (sin auth)
 api.interceptors.request.use((config) => {
@@ -78,16 +95,19 @@ api.interceptors.response.use(
 )
 
 // Helper para tipar respuestas (interceptor ya retorna data)
-const get = <T>(url: string, params?: unknown) =>
-  api.get<T, T>(url, { params })
-const post = <T>(url: string, data?: unknown, params?: unknown) =>
-  api.post<T, T>(url, data, { params })
-const put = <T>(url: string, data?: unknown, params?: unknown) =>
-  api.put<T, T>(url, data, { params })
+const get = <T>(url: string, params?: unknown, config?: AxiosRequestConfig) =>
+  api.get<T, T>(url, { ...config, params })
+const post = <T>(url: string, data?: unknown, params?: unknown, config?: AxiosRequestConfig) =>
+  api.post<T, T>(url, data, { ...config, params })
+const put = <T>(url: string, data?: unknown, params?: unknown, config?: AxiosRequestConfig) =>
+  api.put<T, T>(url, data, { ...config, params })
 const patch = <T>(url: string, data?: unknown, params?: unknown) =>
   api.patch<T, T>(url, data, { params })
 const del = <T>(url: string, params?: unknown) =>
   api.delete<T, T>(url, { params })
+
+const withAdminToken = (token?: string): AxiosRequestConfig | undefined =>
+  token ? { headers: { 'x-update-token': token } } : undefined
 
 // ── Config ───────────────────────────────────────────────────────────────
 export const configApi = {
@@ -135,8 +155,8 @@ export const reportsApi = {
     get<ReportRunExportPayload>(`/reports/${encodeURIComponent(id)}/export`),
   exportAnalytics: () => get<ReportAnalyticsExportPayload>('/reports/analytics/export'),
   delete: (id: string) => del<{ success: boolean }>(`/reports/${encodeURIComponent(id)}`),
-  downloadJsonUrl: (id: string) => `${API_BASE_URL}/reports/${encodeURIComponent(id)}/download/json`,
-  downloadHtmlUrl: (id: string) => `${API_BASE_URL}/reports/${encodeURIComponent(id)}/download/html`,
+  downloadJsonUrl: (id: string) => `${getApiBaseUrl()}/reports/${encodeURIComponent(id)}/download/json`,
+  downloadHtmlUrl: (id: string) => `${getApiBaseUrl()}/reports/${encodeURIComponent(id)}/download/html`,
   assetUrl: (id: string, assetPath: string) => {
     const encodedPath = String(assetPath)
       .replace(/\\/g, '/')
@@ -144,7 +164,7 @@ export const reportsApi = {
       .filter(Boolean)
       .map((segment) => encodeURIComponent(segment))
       .join('/')
-    return `${API_BASE_URL}/reports/${encodeURIComponent(id)}/assets/${encodedPath}`
+    return `${getApiBaseUrl()}/reports/${encodeURIComponent(id)}/assets/${encodedPath}`
   },
 }
 
@@ -183,7 +203,7 @@ export const dockerApi = {
   startDesktop: () => post<unknown>('/docker/start-desktop'),
   run: (action: string) => post<{ started: boolean }>('/docker/run', { action }),
   stop: () => post<{ stopped: boolean }>('/docker/stop'),
-  reportUrl: () => `${API_BASE_URL}/docker/report`,
+  reportUrl: () => `${getApiBaseUrl()}/docker/report`,
 }
 
 // ── Schedules ────────────────────────────────────────────────────────────
@@ -209,10 +229,10 @@ export const errorsApi = {
   images: () => get<ErrorImagesResponse>('/errors/images'),
   /** URL de archivo de evidencia en carpeta (imagen/video/trace/context) */
   fileUrl: (name: string) =>
-    `${API_BASE_URL}/errors/file?name=${encodeURIComponent(name)}`,
+    `${getApiBaseUrl()}/errors/file?name=${encodeURIComponent(name)}`,
   /** @deprecated usar fileUrl */
   imageUrl: (name: string) =>
-    `${API_BASE_URL}/errors/image?name=${encodeURIComponent(name)}`,
+    `${getApiBaseUrl()}/errors/image?name=${encodeURIComponent(name)}`,
 }
 
 // ── Automation ───────────────────────────────────────────────────────────
@@ -328,6 +348,35 @@ export const systemApi = {
       {},
       token ? { headers: { 'x-update-token': token } } : undefined
     ),
+}
+
+// ── Configuración pública en runtime ─────────────────────────────────────
+// Se sirve como archivo estático en el mismo origen de la UI: así se resuelve
+// el huevo y la gallina de necesitar la URL de la API antes de crear axios.
+export const publicConfigApi = {
+  get: async (): Promise<PublicConfig> => {
+    const response = await fetch('/public-config.json', { cache: 'no-store' })
+    if (!response.ok) throw new Error(`public-config.json respondió ${response.status}`)
+    const data = (await response.json()) as Partial<PublicConfig>
+    if (typeof data?.apiBaseUrl !== 'string' || typeof data.configVersion !== 'number') {
+      throw new Error('public-config.json no tiene el formato esperado')
+    }
+    return {
+      apiBaseUrl: data.apiBaseUrl,
+      ...(typeof data.socketUrl === 'string' ? { socketUrl: data.socketUrl } : {}),
+      configVersion: data.configVersion,
+    }
+  },
+}
+
+// ── Configuración central del stack (Ajustes > Stack) ────────────────────
+export const stackConfigApi = {
+  get: (token?: string) =>
+    get<StackConfigResponse>('/system/stack-config', undefined, withAdminToken(token)),
+  save: (token: string, payload: StackConfigSavePayload) =>
+    put<StackConfigResponse>('/system/stack-config', payload, undefined, withAdminToken(token)),
+  restore: (token: string) =>
+    post<StackConfigResponse>('/system/stack-config/restore', {}, undefined, withAdminToken(token)),
 }
 
 export { ApiError }

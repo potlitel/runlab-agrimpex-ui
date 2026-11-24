@@ -62,6 +62,14 @@ export function useDocker() {
     retry: false,
   })
 
+  const agentsQuery = useQuery({
+    queryKey: ['docker', 'agents'],
+    queryFn: () => dockerApi.agents(),
+    enabled,
+    retry: false,
+    refetchInterval: 10000,
+  })
+
   const appendLog = useCallback((message: string, type: DockerLogEntry['type'] = 'info') => {
     logId.current += 1
     setLogs((prev) =>
@@ -71,6 +79,7 @@ export function useDocker() {
 
   const refreshStatus = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['docker', activeProfileId] })
+    void queryClient.invalidateQueries({ queryKey: ['docker', 'agents'] })
   }, [queryClient, activeProfileId])
 
   useEffect(() => {
@@ -130,9 +139,24 @@ export function useDocker() {
 
   const running = !!statusQuery.data?.running
 
+  // El badge del panel distingue "sin asignar" de "desconectado": solo decimos
+  // "Conectado" si el ID del perfil aparece en GET /api/docker/agents.
+  const transport = statusQuery.data?.transport ?? agentsQuery.data?.transport
+  const workstationId =
+    typeof statusQuery.data?.workstationId === 'string' ? statusQuery.data.workstationId : ''
+  const agentConnection: 'local' | 'unassigned' | 'online' | 'offline' =
+    transport === 'local'
+      ? 'local'
+      : !workstationId
+        ? 'unassigned'
+        : (agentsQuery.data?.agents ?? []).some((a) => a.agentId === workstationId)
+          ? 'online'
+          : 'offline'
+
   return {
     enabled,
     unavailable,
+    agentConnection,
     check: checkQuery.data ?? null,
     checkLoading: checkQuery.isPending,
     checkError:

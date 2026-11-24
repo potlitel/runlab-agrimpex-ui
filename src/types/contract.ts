@@ -586,6 +586,38 @@ export interface SystemUpdate {
   [key: string]: unknown
 }
 
+// ── Configuración central del stack / runtime ────────────────────────────
+export interface PublicConfig {
+  apiBaseUrl: string
+  socketUrl?: string
+  configVersion: number
+}
+
+export type StackSecretOperation = 'keep' | 'set' | 'clear'
+
+export interface StackSecretInput {
+  operation?: StackSecretOperation
+  value?: string
+}
+
+export interface StackConfigSavePayload {
+  values?: Record<string, string>
+  secrets?: Record<string, StackSecretInput>
+}
+
+export interface StackPendingApply {
+  key: string
+  service: string
+  command: string
+}
+
+export interface StackConfigResponse {
+  values: Record<string, string | null>
+  secrets: Record<string, { configured: boolean }>
+  pendingApply: StackPendingApply[]
+  configVersion: number
+}
+
 // ── Health / readiness ────────────────────────────────────────────────────
 export type HealthStatus = 'ok' | 'degraded' | 'unhealthy'
 export type HealthBadgeStatus = HealthStatus | 'offline'

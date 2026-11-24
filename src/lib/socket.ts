@@ -4,14 +4,36 @@ import { io, type Socket } from 'socket.io-client'
 // Vite (/socket.io -> :3001). En Docker/CI la API se expone en otra URL;
 // derivamos el origen del socket de VITE_API_URL para no necesitar otra
 // variable, con VITE_SOCKET_URL como override explícito.
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
-const SOCKET_URL =
-  import.meta.env.VITE_SOCKET_URL ||
-  (API_BASE_URL.startsWith('http') ? new URL(API_BASE_URL).origin : undefined)
+const API_BASE_FALLBACK = import.meta.env.VITE_API_URL || '/api'
 
+function derivedSocketUrl(apiBaseUrl: string): string | undefined {
+  return apiBaseUrl.startsWith('http') ? new URL(apiBaseUrl).origin : undefined
+}
+
+export const SOCKET_URL_FALLBACK =
+  import.meta.env.VITE_SOCKET_URL || derivedSocketUrl(API_BASE_FALLBACK)
+
+let socketUrl: string | undefined = SOCKET_URL_FALLBACK
 let socket: Socket | null = null
 let currentProfileId: string | null = null
 let listenersBound = false
+
+// Debe llamarse antes de crear el socket (lo hace el bootstrap). Si el socket
+// ya existiera, se descarta para no conservar el origen horneado.
+export function configureSocketUrl(url?: string): void {
+  const next = url || SOCKET_URL_FALLBACK
+  if (next === socketUrl) return
+  socketUrl = next
+  if (socket) {
+    socket.disconnect()
+    socket = null
+    listenersBound = false
+  }
+}
+
+export function getSocketUrl(): string | undefined {
+  return socketUrl
+}
 
 function bindLifecycleEvents(sock: Socket) {
   if (listenersBound) return
@@ -26,7 +48,7 @@ function bindLifecycleEvents(sock: Socket) {
 
 function getSocket(): Socket {
   if (!socket) {
-    socket = io(SOCKET_URL, {
+    socket = io(socketUrl, {
       autoConnect: false,
       reconnection: true,
     })

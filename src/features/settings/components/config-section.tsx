@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Camera, FolderOpen, FileSearch, RefreshCw, Save, ShieldCheck } from 'lucide-react'
+import { Camera, FolderOpen, FileSearch, RefreshCw, Save, ShieldCheck, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,6 +22,17 @@ import type { UseConfigSettingsReturn } from '../use-config-settings'
 
 type Props = {
   settings: UseConfigSettingsReturn
+}
+
+// Debe cumplir la validación del servidor: /^[A-Za-z0-9._-]{1,64}$/ (server.js).
+function generateAgentId() {
+  const bytes = new Uint8Array(3)
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes)
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256)
+  }
+  return `ws-${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`
 }
 
 export function ConfigSection({ settings }: Props) {
@@ -109,19 +120,26 @@ function ConfigForm({ initial, settings }: { initial: Config; settings: UseConfi
             browsing={settings.browsing === 'folder'}
             placeholder='/ruta/al/proyecto'
           />
-          <div className='space-y-1.5'>
-            <Label htmlFor='workstationId'>Workstation / agente Docker</Label>
-            <Input
-              id='workstationId'
-              value={form.workstationId ?? ''}
-              onChange={(e) => set('workstationId', e.target.value)}
-              placeholder='ws-a'
-            />
-            <p className='text-xs text-muted-foreground'>
-              ID del agente que ejecutará Docker en la workstation. Debe coincidir con{' '}
-              <code>RUNLABQA_AGENT_ID</code>. La ruta del proyecto se resuelve allí, no en el servidor.
-            </p>
+          <div className='grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end'>
+            <div className='space-y-1.5'>
+              <Label htmlFor='workstationId'>ID del agente Docker</Label>
+              <Input
+                id='workstationId'
+                value={form.workstationId ?? ''}
+                onChange={(e) => set('workstationId', e.target.value)}
+                placeholder='ws-a'
+              />
+            </div>
+            <Button type='button' variant='outline' onClick={() => set('workstationId', generateAgentId())}>
+              <Sparkles className='size-4' /> Generar ID
+            </Button>
           </div>
+          <p className='text-xs text-muted-foreground'>
+            Identifica la workstation que ejecutará Docker. Debe coincidir con{' '}
+            <code>RUNLABQA_AGENT_ID</code> en el agente. La ruta del proyecto se resuelve allí, no en el
+            servidor. Usa <strong>Generar ID</strong> y copia el valor en la workstation; cámbialo solo en
+            los perfiles afectados si sustituyes esa máquina.
+          </p>
           <div className='grid gap-4 md:grid-cols-[1fr_auto_auto] md:items-end'>
             <div className='space-y-1.5'>
               <Label htmlFor='envPath'>Archivo .env</Label>

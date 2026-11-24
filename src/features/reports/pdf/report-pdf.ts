@@ -384,15 +384,14 @@ function fitImageBox(width: number, height: number) {
 function convertWebpToPng(dataUrl: string, width = 0, height = 0): Promise<string | null> {
   if (typeof Image === 'undefined' || typeof document === 'undefined') return Promise.resolve(null)
   return new Promise((resolve) => {
-    let timer: ReturnType<typeof setTimeout> | undefined
     let settled = false
     const finish = (value: string | null) => {
       if (settled) return
       settled = true
-      if (timer) clearTimeout(timer)
+      clearTimeout(timer)
       resolve(value)
     }
-    timer = setTimeout(() => finish(null), IMAGE_LOAD_TIMEOUT_MS)
+    const timer = setTimeout(() => finish(null), IMAGE_LOAD_TIMEOUT_MS)
     try {
       const image = new Image()
       image.onload = () => {
@@ -680,7 +679,7 @@ export async function generateRunPdf(
         const bytes = fetched ? bytesFromDataUrl(fetched.dataUrl) : null
         const format = fetched ? detectImageFormat(bytes, fetched.contentType) : null
         let dataUrl = fetched?.dataUrl ?? null
-        let pdfFormat: PdfImageFormat | null = format === 'WEBP' ? 'PNG' : format
+        const pdfFormat: PdfImageFormat | null = format === 'WEBP' ? 'PNG' : format
         if (dataUrl && format === 'WEBP') {
           const dimensions = resolveDimensions(att.width, att.height, bytes, format)
           dataUrl = await convertWebpToPng(dataUrl, dimensions?.width, dimensions?.height)

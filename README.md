@@ -75,6 +75,19 @@ El agente ejecuta `check / status / containers / run / stop / start / ensureGrid
 >
 > Se le dice «servicio» porque conviene registrarlo como servicio del SO para que arranque solo, pero **arquitectónicamente es un cliente, no un servidor**. Eso es justo lo que permite tener workstations detrás de NAT/firewall y sin IP pública: solo la API necesita ser alcanzable. Socket.io reconecta sola ante cortes; el supervisor del SO se encarga si el proceso muere.
 
+> [!NOTE]
+> ### Diseño: token global, ID por workstation, `workstationId` por perfil
+>
+> **El token es global** (uno compartido por la API y todos los agentes): solo responde a la pregunta «¿está autorizado este agente?».
+>
+> **`RUNLABQA_AGENT_ID` identifica la workstation** (un valor por máquina: `ws-a`, `ws-b`, `ws-c`).
+>
+> **`workstationId` es por perfil**: es el puntero que dice «este perfil usa esa workstation».
+>
+> Por eso varios perfiles pueden convivir en la misma UI/API central apuntando a workstations distintas con un único token, y por eso el transporte tiene que acabar siendo una decisión por perfil y no un interruptor global: un perfil con `workstationId` va al agente, y un perfil sin él puede seguir usando su `projectPath` local en el servidor (el caso híbrido previsto).
+>
+> La consecuencia operativa es que, si algún día cambias una workstation de agente (p. ej. `ws-a` → `ws-a-nuevo`), solo editas ese campo en **Ajustes > Proyecto** de los perfiles afectados; no hay que tocar el token ni redesplegar la API.
+
 ### Contrato agente ↔ API
 
 | Elemento | Contrato |
@@ -90,7 +103,7 @@ El agente ejecuta `check / status / containers / run / stop / start / ensureGrid
 
 | Variable / campo | Dónde | Efecto |
 |---|---|---|
-| `workstationId` | `profiles/<id>/config.json` (Ajustes > Proyecto) | Agente que atiende el perfil. Sin él, `/api/docker/*` responde `400`. |
+| `workstationId` | `profiles/<id>/config.json` (Ajustes > Proyecto > ID del agente Docker) | Agente que atiende el perfil. Sin él, `/api/docker/*` responde `400`. |
 | `projectPath` | `profiles/<id>/config.json` | Ruta **dentro de la workstation**, usada como `cwd` por el agente. |
 | `RUNLABQA_AGENT_TOKEN` | entorno de la API y del agente | Token compartido; sin él la API rechaza conexiones de agentes (fail closed). |
 | `RUNLABQA_AGENT_URL` | entorno del agente | URL pública de la API central (`https://…`). |
@@ -99,7 +112,7 @@ El agente ejecuta `check / status / containers / run / stop / start / ensureGrid
 | `RUNLABQA_DOCKER_TRANSPORT` | entorno de la API | `agent` (default) o `local` (modo legado: la API ejecuta `docker` en su propio host, solo para desarrollo). |
 | `NODE_USE_ENV_PROXY` | entorno del agente | Si está activo, el agente se relanza sin él para que Socket.io no pase por el proxy corporativo; `HTTP_PROXY`/`HTTPS_PROXY` siguen disponibles para Docker. |
 
-En el despliegue centralizado, `VITE_API_URL` y `VITE_SOCKET_URL` deben apuntar a la URL pública (no `localhost`) y reconstruir la UI; ver [Variables horneadas](#3-variables-horneadas-importante).
+En el despliegue centralizado, `VITE_API_URL` y `VITE_SOCKET_URL` son solo el **fallback** horneado; la URL pública efectiva se resuelve en tiempo de ejecución desde Ajustes > Stack, sin reconstruir la UI: ver [Configuración en tiempo de ejecución](#3-configuración-en-tiempo-de-ejecución-sin-reconstruir-la-ui).
 
 ### Seguridad
 
@@ -424,27 +437,34 @@ HTTP 200 /  ·  <title>RunLab Agrimpex — QA Dashboard</title>
 Bundle: http://localhost:3001/api y http://localhost:3001
 ```
 
-### 3) Variables horneadas (importante)
+### 3) Configuración en tiempo de ejecución (sin reconstruir la UI)
 
-`VITE_API_URL` y `VITE_SOCKET_URL` se escriben en el bundle en **tiempo de build** y deben ser alcanzables desde el **navegador**. Defaults: `http://localhost:3001/api` y `http://localhost:3001`.
+`VITE_API_URL` y `VITE_SOCKET_URL` siguen horneándose en el bundle como **fallback**, pero la UI ya no depende de ellos: en el arranque consulta `/public-config.json` con `cache: 'no-store'` y aplica `apiBaseUrl` / `socketUrl` antes de crear axios y el socket. La API escribe ese archivo desde el `.env` central. Defaults del fallback: `http://localhost:3001/api` y `http://localhost:3001`.
 
-Para desplegar en otro equipo:
+Para desplegar en otro equipo con su hostname real:
 
-```bash
-# .env de este repo
-VITE_API_URL=http://10.0.0.50:3001/api
-VITE_SOCKET_URL=http://10.0.0.50:3001
+1. Define `UPDATE_TOKEN` en el `.env` de este repo y recrea la API para habilitar la administración (sin token, los endpoints devuelven `503` y no revelan ningún valor):
 
-docker compose up -d --build runlabqa-ui
-```
+   ```bash
+   docker compose up -d --force-recreate runlabqa-api
+   ```
 
-`src/lib/socket.ts` deriva el origen del socket de `VITE_API_URL`, así que normalmente basta con cambiar esa variable. Reconstruir es obligatorio: cambiar `.env` y hacer solo `restart` no modifica el bundle ya generado.
+2. En **Ajustes > Stack**, teclea ese token y cambia `VITE_API_URL` / `VITE_SOCKET_URL`. El guardado actualiza el `.env` central, publica `public/public-config.json` (con `configVersion`) y crea una copia en `/data/config-backups` (últimas 10).
+3. Recarga la UI: usa las URLs servidas en runtime. **No hace falta** `docker compose up -d --build runlabqa-ui` por cambiar el hostname.
+
+Si `/public-config.json` no responde, la UI conserva las URLs del bundle y muestra un aviso de degradación; en ese caso sí puede ser necesario reconstruir o arreglar el montaje.
+
+> Este `.env` de la carpeta del stack **no es** el `.env` del proyecto de pruebas que se edita en Ajustes > Proyecto (`envPath`) ni el de los perfiles. Ajustes > Stack solo toca las variables permitidas del `.env` de Compose; los entornos del kit Playwright siguen gestionándose por perfil.
+
+#### Qué cambios requieren recrear contenedores
+
+Los cambios de URL pública se aplican al recargar. Los de token (`UPDATE_TOKEN`, `RUNLABQA_AGENT_TOKEN`), transporte (`RUNLABQA_DOCKER_TRANSPORT`), puertos y rutas se marcan como **pendiente de aplicar**: la vista muestra el comando exacto, por ejemplo `docker compose up -d --force-recreate runlabqa-api`, que debes ejecutar tú. La aplicación no ejecuta Docker ni muestra valores secretos: estos solo aparecen como «Configurado» y se sobrescriben si tecleas un valor nuevo.
 
 ### 4) Ciclo de vida
 
 ```bash
 docker compose up -d --build          # construir y levantar todo
-docker compose up -d --build runlabqa-ui # solo la UI (tras cambiar VITE_*)
+docker compose up -d --build runlabqa-ui # solo la UI (tras cambiar código)
 docker compose logs -f runlabqa-ui
 docker compose restart runlabqa-ui
 docker compose down                   # conserva runlabqa-data
@@ -502,21 +522,25 @@ El stack se define en **`docker-compose.yml`**, en este mismo repo, junto con `.
 | `ports` | `"${UI_PORT:-3002}:3000"`. Contenedor escucha `3000`; host publica `3002` porque `3000` es DAM. |
 | `depends_on` | `runlabqa-api` con `condition: service_healthy` → la UI espera a `GET /api/health`. |
 | `networks` | `runlabqa-network` (bridge privada con la API). |
-| `volumes` | Ninguno: el bundle es estático y se reconstruye cuando cambian las URLs. |
+| `volumes` | `./public/public-config.json:/app/dist/public-config.json:ro`: el recurso de runtime que escribe la API se sirve desde el mismo origen de la UI. |
 
-### Por qué `VITE_*` exige reconstruir
+### Servicio `runlabqa-api` (configuración central del stack)
 
-Vite sustituye `import.meta.env.VITE_*` en tiempo de **build** y genera archivos JS ya resueltos en `dist/`. Por tanto:
+| Bloque del YAML | Valor / efecto |
+|---|---|
+| `volumes` | `${RUNLABQA_STACK_DIR:-.}:/stack-env`: el directorio que contiene el `.env` central. La API solo escribe ahí el `.env` y `public/public-config.json`, con archivo temporal + `rename`. |
+| `environment.RUNLABQA_STACK_ENV_DIR` | `/stack-env`, ruta fija que consume el módulo de configuración del stack. |
+| `environment.RUNLABQA_PUBLIC_CONFIG_PATH` | `/stack-env/public/public-config.json`, el mismo archivo que monta la UI. |
+| `environment.UPDATE_TOKEN` | Habilita Ajustes > Stack y `/api/system/update`. Sin él, `503` (fail closed). |
+| `environment.RUNLABQA_DATA_DIR` | `/data`: las copias van a `/data/config-backups`, nunca al repo. |
 
-- El navegador descarga `http://localhost:3001/api` escrito en el bundle; el contenedor no “lee” esa variable al arrancar.
-- Debe ser una URL alcanzable **desde el navegador**. Si despliegas en otro equipo, usa `http://<IP-del-servidor>:3001/api`.
-- Cambiar `.env` y hacer solo `docker compose restart runlabqa-ui` **no cambia nada**. Hay que hacer:
+### Fallback horneado y configuración en runtime
 
-```bash
-docker compose up -d --build runlabqa-ui
-```
+Vite sustituye `import.meta.env.VITE_*` en tiempo de **build**, así que esos valores siguen siendo la base del bundle y deben ser alcanzables desde el navegador. Pero ya no son la única fuente: `src/main.tsx` carga `/public-config.json` **antes de renderizar**, con `cache: 'no-store'`, y aplica `apiBaseUrl` / `socketUrl` a axios y al socket. Si el recurso falla, se usan las `VITE_*` y aparece un aviso.
 
-- `src/lib/socket.ts` deriva el origen del socket de `VITE_API_URL`, así que en la mayoría de los casos basta con cambiar esa única variable; `VITE_SOCKET_URL` queda como override explícito.
+- Cambiar el hostname desde Ajustes > Stack no exige reconstruir: actualiza el `.env` central y el recurso público con un `configVersion` nuevo.
+- `src/lib/socket.ts` deriva el origen del socket de la API cuando no hay `socketUrl` explícita.
+- Reconstruir la UI sigue siendo necesario cuando cambia el **código**, no cuando cambian estas URLs.
 
 ### Cómo funcionan los `.env` en este YAML
 
@@ -532,8 +556,8 @@ VITE_SOCKET_URL=http://localhost:3001
 
 Distinciones que suelen confundir:
 
-1. **Un solo `.env`, dos lectores.** Ahora compose y Vite comparten carpeta: el mismo `.env` lo lee Compose para el stack y Vite en `npm run dev`. En Docker el contenedor no corre Vite: las `VITE_*` ya quedaron horneadas en el bundle.
-2. **Build vs runtime en la UI.** `VITE_*` y los proxies son build-args (`--build`). `UI_PORT` es runtime (`up -d` y ya recrea el contenedor).
+1. **Un solo `.env`, tres lectores.** Compose lo lee para el stack, Vite lo lee en `npm run dev` y el módulo de Ajustes > Stack lo edita (solo la allowlist). En Docker el contenedor no corre Vite: las `VITE_*` quedan como fallback del bundle, pero la URL efectiva se publica en runtime.
+2. **Build vs runtime en la UI.** `VITE_*` y los proxies son build-args (`--build`). `UI_PORT` es runtime (`up -d` y ya recrea el contenedor). Las URLs públicas cambiadas desde Ajustes > Stack son runtime puro.
 3. **Defaults inline.** `${UI_PORT:-3002}` significa “usa `UI_PORT` si está definida; si no, `3002`”.
 4. **Override puntual.** `UI_PORT=3010 docker compose up -d` publica la UI en `3010` sin tocar archivos.
 5. **Secretos.** `.env` está ignorado por Git en este repo; nunca subas tokens ni credenciales del AUT.
@@ -544,8 +568,11 @@ Distinciones que suelen confundir:
 |---|---|---|---|
 | `UI_PORT` | `3002` | runtime | Puerto publicado de la UI. |
 | `API_PORT` | `3001` | runtime | Puerto publicado de la API (a la que apunta el bundle). |
-| `VITE_API_URL` | `http://localhost:3001/api` | build | Base REST horneada en el bundle. |
-| `VITE_SOCKET_URL` | `http://localhost:3001` | build | Origen Socket.io (override opcional). |
+| `VITE_API_URL` | `http://localhost:3001/api` | build / fallback | Base REST del bundle; Ajustes > Stack la reemplaza en runtime. |
+| `VITE_SOCKET_URL` | `http://localhost:3001` | build / fallback | Origen Socket.io (override opcional), reemplazable en runtime. |
+| `UPDATE_TOKEN` | vacío | runtime | Gate de Ajustes > Stack y `/api/system/update`; sin él, `503`. |
+| `RUNLABQA_STACK_DIR` | `.` | runtime | Directorio del `.env` central montado en la API como `/stack-env`. |
+| `RUNLABQA_PUBLIC_CONFIG_FILE` | `./public/public-config.json` | runtime | Archivo compartido servido por la UI en `/public-config.json`. |
 | `API_BASE_IMAGE` | `node:22-alpine` | build | Base de la API; no afecta al bundle de la UI. |
 | `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | vacíos | build | npm dentro del build. |
 

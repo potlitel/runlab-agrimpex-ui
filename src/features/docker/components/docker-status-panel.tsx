@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { DockerCheckResponse, DockerStatus } from '@/types/contract'
 
 type Props = {
+  agentConnection?: 'local' | 'unassigned' | 'online' | 'offline'
   check: DockerCheckResponse | null
   checkLoading: boolean
   checkError: string | null
@@ -22,7 +23,15 @@ function boolLabel(value: unknown) {
   return String(value)
 }
 
+const AGENT_LABELS = {
+  local: 'Modo local',
+  unassigned: 'Sin asignar',
+  online: 'Conectado',
+  offline: 'Desconectado',
+} as const
+
 export function DockerStatusPanel({
+  agentConnection,
   check,
   checkLoading,
   checkError,
@@ -121,18 +130,20 @@ export function DockerStatusPanel({
               <dd className='truncate font-mono text-xs' title={String(status.projectPath ?? '')}>
                 {status.projectPath ? String(status.projectPath) : '—'}
               </dd>
-              <dt className='text-muted-foreground'>Workstation</dt>
+              <dt className='text-muted-foreground'>ID del agente</dt>
               <dd className='font-mono text-xs'>
                 {status.workstationId ? String(status.workstationId) : '—'}
               </dd>
-              <dt className='text-muted-foreground'>Agente</dt>
+              <dt className='text-muted-foreground'>Estado del agente</dt>
               <dd className='flex items-center gap-1'>
-                {status.workstationId && !statusError ? (
+                {agentConnection === 'online' ? (
                   <CheckCircle2 className='size-3.5 text-emerald-500' />
                 ) : (
-                  <XCircle className='size-3.5 text-muted-foreground' />
+                  <XCircle
+                    className={`size-3.5 ${agentConnection === 'offline' ? 'text-red-500' : 'text-muted-foreground'}`}
+                  />
                 )}
-                {status.workstationId ? 'Conectado' : 'Sin asignar'}
+                {AGENT_LABELS[agentConnection ?? 'unassigned']}
               </dd>
               <dt className='text-muted-foreground'>Grid Selenium</dt>
               <dd className='flex items-center gap-1'>
