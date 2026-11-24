@@ -123,13 +123,13 @@ Se le suele llamar «servicio» porque conviene registrarlo como servicio del si
 
 El daemon Docker (`/var/run/docker.sock`) sigue siendo local a la workstation: el agente es el único que habla con él, con los privilegios del usuario que lo ejecuta (en la práctica, root-equivalente por diseño).
 
-La UI trae una vista didáctica en **`/agent-flow`** («Flujo del agente», enlazada desde `/docker` y el sidebar), con el mismo estilo animado que `/live-flow`: muestra el registro saliente, el comando, la ejecución local, el streaming de eventos y el siguiente slice. Es **híbrida**: si `GET /api/docker/agents` responde, resalta los agentes reales y el `workstationId` del perfil; si no, sigue funcionando como simulación.
+La UI trae una vista didáctica en **`/agent-flow`** («Flujo del agente», enlazada desde `/docker` y el sidebar), con el mismo estilo animado que `/live-flow`: muestra el registro saliente, el comando, la ejecución local de Docker y de Playwright, el streaming de eventos y la persistencia de reportes y artefactos. Es **híbrida**: si `GET /api/docker/agents` responde, resalta los agentes reales y el `workstationId` del perfil; si no, sigue funcionando como simulación.
 
 #### Para ponerlo en marcha
 
 1. Pon `RUNLABQA_AGENT_TOKEN=<token>` en el `.env` de la API y reconstruye el stack.
 2. Arranca el agente en cada workstation con `RUNLABQA_AGENT_URL`, `RUNLABQA_AGENT_ID` y el mismo token.
-3. Asigna ese ID en **Ajustes > Proyecto > Workstation / agente Docker** del perfil.
+3. Asigna ese ID en **Ajustes > Proyecto > ID del agente Docker** del perfil. El campo tiene un botón **Generar ID** que crea un valor válido (`ws-` + 6 hex); cópialo a `RUNLABQA_AGENT_ID` en la workstation.
 
 ```bash
 # En cada workstation (repo runlab-agrimpex-api):
@@ -170,6 +170,141 @@ El criterio es **por perfil**, no global:
 - Perfil **sin** `workstationId` → se mantiene `projectPath` local y la API ejecuta Docker y Playwright en el servidor (equivalente al modo `local`).
 
 `RUNLABQA_DOCKER_TRANSPORT=local` en el `.env` de la API fuerza el modo legado global para desarrollo y recrea el contenedor; en ese modo el campo `workstationId` se ignora por completo y todas las suites corren en la API. Los artefactos ya transferidos permanecen en el perfil.
+
+#### Diagrama integral: central, workstation, token y Socket.io
+
+El token **no identifica la workstation**: solo autoriza a quien se conecta. El `RUNLABQA_AGENT_ID` identifica la máquina y el `workstationId` del perfil decide a qué máquina se envía cada trabajo. Todo el transporte es una conexión Socket.io **saliente** del agente; nunca se abre un puerto en la workstation.
+
+```mermaid
+flowchart LR
+  subgraph CENTRAL["☁️ CAPA CENTRAL — stack Docker / API"]
+    direction TB
+    UI["🖥️ UI React<br/>/tests · /agent-flow<br/>header X-Profile-Id"]
+    SOCKET["🔌 Socket.io central<br/>sala profile-id<br/>(eventos en vivo)"]
+    REST["🚦 API REST<br/>/api/tests/* · /api/reports<br/>/api/docker/agents"]
+    REG["🧭 agentRegistry<br/>agentId → socket"]
+    SELECT["🔀 testControl<br/>transporte por perfil"]
+    STORE[("🗃️ profiles/id/reports<br/>agent/runId + assets")]
+    ENVAPI["🔐 .env central<br/>RUNLABQA_AGENT_TOKEN<br/>RUNLABQA_DOCKER_TRANSPORT=agent<br/>PORT · RUNLABQA_DATA_DIR"]
+  end
+
+  subgraph PROFILE["📇 CONFIG DEL PERFIL"]
+    CFG["workstationId = ws-a<br/>projectPath = /home/potlitel/Trabajo/EICMA/Agrimpex/playwright-kit-profesional<br/>playwrightCmd = npx playwright"]
+  end
+
+  subgraph LOCALMODE["🧪 MODO LOCAL"]
+    LOCALPW["Playwright en la API<br/>sin agente<br/>projectPath montado en el stack"]
+  end
+
+  subgraph WS1["🏭 WORKSTATION ws-a —NAT / firewall—"]
+    direction TB
+    ENVWS["🔑 entorno del agente<br/>RUNLABQA_AGENT_URL=https://dashboard.example.com<br/>RUNLABQA_AGENT_ID=ws-a<br/>RUNLABQA_AGENT_TOKEN=el-mismo-token"]
+    AGENT["🤖 node agent/index.js<br/>cliente Socket.io saliente<br/>sin puertos abiertos"]
+    DOCKER["🐳 docker.sock local<br/>check · status · run · ensureGrid"]
+    PW["🎭 Playwright + navegadores<br/>cwd = projectPath<br/>collect · runTests · abort"]
+  end
+
+  WSOTHER["🏭 OTRAS WORKSTATIONS<br/>ws-b, ws-c…<br/>mismo token, ID distinto"]
+
+  UI -->|"HTTP + X-Profile-Id"| REST
+  UI <-->|"Socket.io · eventos del perfil"| SOCKET
+  REST --> CFG
+  CFG --> SELECT
+  ENVAPI -.-> REST
+  REST --> REG
+  AGENT -->|"1) connect: role=agent + agentId + token"| REG
+  WSOTHER -->|"connect con su RUNLABQA_AGENT_ID"| REG
+  REG -->|"2) agent:command requestId + op + args"| AGENT
+  SELECT -->|"3) workstationId con agente online"| AGENT
+  SELECT -.->|"sin workstationId o RUNLABQA_DOCKER_TRANSPORT=local"| LOCALPW
+  AGENT --> DOCKER
+  AGENT --> PW
+  PW -->|"4) agent:event: execution:*, test:*, progress, test:output"| SOCKET
+  AGENT -->|"5) agent:result: requestId + manifest"| REST
+  REST -->|"6) valida rutas/tamaños y persiste artefactos"| STORE
+  SOCKET -->|"7) reenvía a la sala del perfil"| UI
+  REST -->|"/api/reports/:id y /assets/*"| UI
+  ENVWS -.-> AGENT
+
+  classDef central fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e,stroke-width:1px
+  classDef station fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:1px
+  classDef branch fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:1px
+  class UI,SOCKET,REST,REG,SELECT,STORE central
+  class ENVWS,AGENT,DOCKER,PW,WSOTHER station
+  class CFG,LOCALPW,ENVAPI branch
+```
+
+Secuencia de una corrida de tests remota (el mismo `requestId` acompaña cada evento del agente):
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant UI as UI (sala del perfil)
+  participant API as API + testControl
+  participant REG as agentRegistry
+  participant AG as Agente ws-a
+  participant PW as Playwright en ws-a
+
+  UI->>API: POST /api/tests/run (testIds, entorno, opciones)
+  API->>REG: agent:command runTests (wait:false)
+  REG->>AG: requestId + projectPath + envVars
+  AG->>PW: npx playwright test (cwd = projectPath)
+  PW-->>AG: progreso: execution:started / test:* / progress
+  AG-->>REG: agent:event con requestId
+  REG-->>UI: evento reenviado a profile-id
+  PW-->>AG: JSON del reporte + capturas
+  AG-->>REG: agent:result con reportId, summary y manifest
+  REG-->>API: onResult
+  API->>API: persiste reports/agent/runId (sin traversal ni archivos de más de 10 MB)
+  API-->>UI: /api/reports y /api/reports/:id/assets/*
+```
+
+| Variable | Dónde se define | Efecto |
+| --- | --- | --- |
+| `RUNLABQA_AGENT_TOKEN` | `.env` central **y** entorno de cada agente | Credencial compartida; sin ella la API rechaza la conexión (fail closed). |
+| `RUNLABQA_AGENT_ID` | entorno de cada workstation | Identifica la máquina; debe coincidir con el `workstationId` del perfil. |
+| `RUNLABQA_AGENT_URL` | entorno de cada workstation | URL de la API a la que conecta el agente (saliente). |
+| `RUNLABQA_AGENT_LABEL` | entorno de cada workstation (opcional) | Etiqueta legible en `/api/docker/agents`. |
+| `RUNLABQA_DOCKER_TRANSPORT=local` | `.env` central | Interruptor global de rollback: ignora `workstationId` y ejecuta Docker y Playwright en la API. |
+| `RUNLABQA_DATA_DIR` | `.env` central | Dónde viven perfiles, colecciones y reportes (montaje persistente). |
+| `VITE_API_URL` / `VITE_SOCKET_URL` | `.env` de la UI | Apuntan la UI a la API central; requieren rebuild de la imagen. |
+
+#### Ejemplo: kit de pruebas ubicado en otra workstation
+
+`projectPath` es siempre la ruta **vista por quien ejecuta Playwright**. Si el kit está en `ws-a` en `/home/potlitel/Trabajo/EICMA/Agrimpex/playwright-kit-profesional`, esa ruta no existe en la API: se guarda literalmente en la configuración del perfil y el agente la usa como `cwd`. No hace falta copiar el kit al servidor ni montarlo en el contenedor; solo viajan el comando, el entorno resuelto, los eventos y el manifiesto de artefactos.
+
+```bash
+# 1) En ws-a: preparar el kit y arrancar el agente con el token central.
+cd /home/potlitel/Trabajo/EICMA/Agrimpex/playwright-kit-profesional
+npx playwright install
+cd /ruta/al/repo/runlab-agrimpex-api
+RUNLABQA_AGENT_URL=https://dashboard.example.com \
+RUNLABQA_AGENT_ID=ws-a \
+RUNLABQA_AGENT_TOKEN=<token> \
+node agent/index.js
+
+# 2) En la API: guardar la ruta remota en el perfil (POST reemplaza la config;
+#    incluye los campos que ya tenías para no perderlos).
+curl -X POST http://localhost:3001/api/config \
+  -H 'X-Profile-Id: perfil-1' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "projectPath": "/home/potlitel/Trabajo/EICMA/Agrimpex/playwright-kit-profesional",
+    "playwrightCmd": "npx playwright",
+    "workstationId": "ws-a",
+    "envPath": "",
+    "txtFolderPath": "",
+    "seleniumRemoteUrl": "",
+    "errorImagesPath": "",
+    "jsonDataPath": ""
+  }'
+
+# 3) Verificar registro, recolección y corrida remota desde la API.
+curl -H 'X-Profile-Id: perfil-1' http://localhost:3001/api/docker/agents
+curl -H 'X-Profile-Id: perfil-1' http://localhost:3001/api/tests/collect
+```
+
+Lo equivalente en la UI es **Ajustes > Proyecto**: *ID del agente Docker* = `ws-a` y *Ruta del proyecto* = la ruta absoluta del kit en `ws-a`. Si `ws-a` no está conectada, `/api/tests/collect` y `/api/tests/run` responden `503` con `Agente ws-a no conectado; la corrida no se ejecutará localmente`.
 
 ## Requisitos
 

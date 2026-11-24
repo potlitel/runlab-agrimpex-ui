@@ -15,7 +15,7 @@ export function AgentFlowPage() {
             <div>
               <h1 className='text-xl font-semibold tracking-tight'>Flujo del agente</h1>
               <p className='text-sm text-muted-foreground'>
-                Arquitectura distribuida del módulo Docker: workstation → agente → API → UI
+                Arquitectura distribuida: Docker y Playwright en la workstation → agente → API → UI
               </p>
             </div>
           </div>

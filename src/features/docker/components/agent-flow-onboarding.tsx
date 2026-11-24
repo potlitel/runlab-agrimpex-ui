@@ -63,9 +63,9 @@ const STAGES: Stage[] = [
     accent: 'from-amber-500/30 to-orange-500/10',
   },
   {
-    id: 'next',
-    title: '5. Siguiente slice',
-    detail: 'collect / runTests también en el agente, devolviendo reportes y artefactos a la API central.',
+    id: 'tests',
+    title: '5. Tests remotos',
+    detail: 'collect / runTests / abort ejecutan Playwright en el agente; la API persiste el reporte y los assets.',
     icon: FileJson2,
     accent: 'from-rose-500/30 to-pink-500/10',
   },
@@ -79,7 +79,8 @@ const EVENT_STREAM = [
   { label: 'agent:event', text: 'evento reenviado a profile:perfil-1' },
   { label: 'agent:result', text: 'ok · check → Docker 29.7.1' },
   { label: 'profiles:status', text: 'perfil-1 corriendo (docker)' },
-  { label: 'próximo', text: 'agent:command runTests → reporte + assets' },
+  { label: 'tests:remoto', text: 'agent:command runTests → Playwright en ws-a' },
+  { label: 'execution:completed', text: 'reporte + assets persistidos en la API' },
 ]
 
 type WorkstationView = {
@@ -165,12 +166,12 @@ export function AgentFlowOnboarding() {
               {assigned ? <Badge variant='outline'>perfil → {assigned}</Badge> : null}
             </div>
             <CardTitle className='text-xl sm:text-2xl'>
-              Cómo el agente ejecuta Docker en cada workstation
+              Cómo el agente ejecuta Docker y Playwright en cada workstation
             </CardTitle>
             <CardDescription className='max-w-3xl text-sm'>
-              La UI y la API son centralizadas; el daemon Docker queda dentro de cada workstation. El
-              agente conecta hacia fuera, ejecuta localmente y devuelve eventos y resultados por el
-              mismo canal.
+              La UI y la API son centralizadas; Docker y Playwright quedan dentro de cada workstation.
+              El agente conecta hacia fuera, ejecuta localmente y devuelve eventos, reportes y
+              resultados por el mismo canal.
             </CardDescription>
           </div>
           <div className='flex shrink-0 flex-wrap items-center gap-2'>
@@ -249,6 +250,7 @@ export function AgentFlowOnboarding() {
                   lines={[
                     `ID: ${w.id}`,
                     'docker.sock local (no sale de aquí)',
+                    'playwright: collect / runTests / abort',
                     w.connectedAt ? `conectado ${w.connectedAt}` : 'check / run / stop / start',
                   ]}
                 />
@@ -262,7 +264,8 @@ export function AgentFlowOnboarding() {
               subtitle='contenedor del stack'
               lines={[
                 'agentRegistry por agentId',
-                'no spawnea docker',
+                'testControl elige por workstationId',
+                'no spawnea docker ni Playwright',
                 'enruta a profile:<id>',
               ]}
             />
@@ -272,7 +275,7 @@ export function AgentFlowOnboarding() {
               icon={MonitorPlay}
               title='UI'
               subtitle='centralizada'
-              lines={['X-Profile-Id', 'docker:log / docker:exit', 'profiles:status']}
+              lines={['X-Profile-Id', 'docker:log / execution:*', 'test:* / profiles:status', '/api/reports y assets']}
             />
           </div>
 
@@ -372,8 +375,8 @@ export function AgentFlowOnboarding() {
           />
           <InfoPill
             icon={FileJson2}
-            title='Playwright, en la API'
-            text='Hoy las suites siguen donde corre la API; ejecutarlas en el agente es el siguiente slice.'
+            title='Playwright, en la workstation'
+            text='collect / runTests / abort corren en el agente; la API guarda el reporte y las evidencias.'
           />
         </div>
 
