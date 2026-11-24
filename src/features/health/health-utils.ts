@@ -122,6 +122,15 @@ export function formatRelativeTime(
   return `Hace ${Math.floor(minutes / 60)} h`
 }
 
+export function formatExactTime(at?: number): string {
+  if (!at) return 'Sin datos'
+  return new Date(at).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
 export function formatUptime(seconds?: number) {
   if (typeof seconds !== 'number') return '—'
   const minutes = Math.floor(seconds / 60)

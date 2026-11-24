@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HealthDetail, HealthHistoryPoint } from '@/types/contract'
+import { HealthChartTooltip } from './health-charts'
 import { HealthPage } from './health-page'
 
 const health = vi.hoisted(() => ({
@@ -10,6 +11,7 @@ const health = vi.hoisted(() => ({
     failedChecks: [] as string[],
     data: undefined as HealthDetail | undefined,
     isError: false,
+    isLoading: false,
     isFetching: false,
     dataUpdatedAt: 0 as number,
     history: [] as HealthHistoryPoint[],
@@ -84,6 +86,7 @@ describe('HealthPage', () => {
       failedChecks: [],
       data: okData,
       isError: false,
+      isLoading: false,
       isFetching: false,
       dataUpdatedAt: 0,
       history: [],
@@ -150,6 +153,7 @@ describe('HealthPage', () => {
       failedChecks: [],
       data: undefined,
       isError: true,
+      isLoading: false,
       isFetching: false,
       dataUpdatedAt: 0,
       history: [],
@@ -236,6 +240,62 @@ describe('HealthPage', () => {
     render(<HealthPage />)
 
     expect(screen.getAllByText('Hace 5 s').length).toBeGreaterThan(1)
+  })
+
+  it('muestra un skeleton mientras llegan los datos del gráfico', () => {
+    health.state.isLoading = true
+    health.state.history = []
+
+    render(<HealthPage />)
+
+    expect(screen.getByTestId('health-sparkline-skeleton')).toBeTruthy()
+    expect(screen.queryByTestId('health-sparkline-empty')).toBeNull()
+    expect(screen.queryByTestId('health-sparkline')).toBeNull()
+  })
+
+  it('muestra la hora exacta de la última actualización junto al indicador', () => {
+    health.state.dataUpdatedAt = new Date(2026, 0, 1, 10, 41, 0).getTime()
+
+    render(<HealthPage />)
+
+    expect(screen.getByTestId('health-gauge')).toBeTruthy()
+    expect(screen.getByTestId('health-last-updated').textContent).toContain(
+      'Actualizado: 10:41 AM'
+    )
+  })
+
+  it('el tooltip del gráfico muestra el uptime y la hora del punto', () => {
+    render(
+      <HealthChartTooltip
+        active
+        payload={[{ payload: { at: new Date(2026, 0, 1, 10, 41, 0).getTime(), uptime: 65 } }]}
+      />
+    )
+
+    const tooltip = screen.getByTestId('health-chart-tooltip')
+    expect(tooltip.textContent).toContain('1 min 5 s')
+    expect(tooltip.textContent).toContain('10:41 AM')
+  })
+
+  it('la barra circular avanza con la cuenta regresiva del sondeo', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    health.state.dataUpdatedAt = Date.now()
+
+    render(<HealthPage />)
+    const offset = () =>
+      Number(
+        screen
+          .getByTestId('health-poll-ring')
+          .querySelectorAll('circle')[1]
+          .getAttribute('stroke-dashoffset')
+      )
+    const initial = offset()
+    act(() => {
+      vi.advanceTimersByTime(10_000)
+    })
+
+    expect(offset()).toBeLessThan(initial)
   })
 
   it('no revela stack traces, rutas ni valores de entorno en el detalle', () => {

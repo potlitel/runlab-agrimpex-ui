@@ -27,8 +27,10 @@ import {
   CHECK_NAMES,
   CHECK_STATUS_LABELS,
   DEFAULT_CHECK_ICON,
+  POLL_INTERVAL_SECONDS,
   STATUS_BADGE_CLASSES,
   STATUS_LABELS,
+  formatExactTime,
   formatRelativeTime,
   formatUptime,
   sanitizeCheckMessage,
@@ -142,6 +144,7 @@ export function HealthPage() {
     failedChecks,
     data,
     isError,
+    isLoading,
     isFetching,
     dataUpdatedAt,
     history,
@@ -159,6 +162,11 @@ export function HealthPage() {
   }, [])
 
   const remainingSeconds = secondsUntilNextPoll(dataUpdatedAt, now)
+  const ringRadius = 12
+  const ringCircumference = 2 * Math.PI * ringRadius
+  const ringOffset =
+    ringCircumference *
+    (remainingSeconds / POLL_INTERVAL_SECONDS)
 
   return (
     <>
@@ -190,8 +198,46 @@ export function HealthPage() {
             >
               <Timer className='size-3.5' /> {remainingSeconds} s
             </span>
-            <Button size='sm' variant='outline' onClick={refresh}>
-              <RefreshCw className='size-4' /> Actualizar
+            <Button
+              size='sm'
+              variant='outline'
+              className='gap-2 rounded-full ps-1 pe-3'
+              onClick={refresh}
+            >
+              <span
+                data-testid='health-poll-ring'
+                className='relative inline-flex size-7 items-center justify-center'
+              >
+                <svg
+                  className='absolute inset-0 -rotate-90'
+                  width='28'
+                  height='28'
+                  viewBox='0 0 28 28'
+                  aria-hidden='true'
+                >
+                  <circle
+                    cx='14'
+                    cy='14'
+                    r={ringRadius}
+                    fill='none'
+                    strokeWidth='2'
+                    className='stroke-muted'
+                  />
+                  <circle
+                    cx='14'
+                    cy='14'
+                    r={ringRadius}
+                    fill='none'
+                    strokeWidth='2'
+                    strokeLinecap='round'
+                    className='stroke-primary'
+                    strokeDasharray={ringCircumference}
+                    strokeDashoffset={ringOffset}
+                  />
+                </svg>
+                <RefreshCw className='size-4' />
+              </span>
+              Actualizar
             </Button>
             <HeaderTools />
           </div>
@@ -210,13 +256,24 @@ export function HealthPage() {
                 </div>
                 <div className='flex items-center gap-3'>
                   <HealthGauge value={healthPercentage} />
-                  <Badge
-                    variant='outline'
-                    className={`text-sm ${STATUS_BADGE_CLASSES[status]}`}
-                    aria-label={`Estado del backend: ${label}`}
-                  >
-                    {label}
-                  </Badge>
+                  <div className='flex flex-col items-start gap-1'>
+                    <Badge
+                      variant='outline'
+                      className={`text-sm ${STATUS_BADGE_CLASSES[status]}`}
+                      aria-label={`Estado del backend: ${label}`}
+                    >
+                      {label}
+                    </Badge>
+                    {dataUpdatedAt ? (
+                      <span
+                        data-testid='health-last-updated'
+                        className='text-xs text-muted-foreground'
+                        title={new Date(dataUpdatedAt).toLocaleString()}
+                      >
+                        Actualizado: {formatExactTime(dataUpdatedAt)}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -250,7 +307,7 @@ export function HealthPage() {
                 <p className='text-xs text-muted-foreground'>
                   Tendencia del tiempo activo
                 </p>
-                <HealthSparkline history={history} />
+                <HealthSparkline history={history} isLoading={isLoading} />
               </div>
             </CardContent>
           </Card>
