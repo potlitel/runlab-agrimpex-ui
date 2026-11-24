@@ -52,6 +52,9 @@ services:
       TZ: ${TZ:-America/Argentina/Buenos_Aires}
       # Sin token, /api/system/update queda deshabilitado (503).
       UPDATE_TOKEN: ${UPDATE_TOKEN:-}
+      # Docker se ejecuta en la workstation del perfil, nunca en este host.
+      RUNLABQA_DOCKER_TRANSPORT: ${RUNLABQA_DOCKER_TRANSPORT:-agent}
+      RUNLABQA_AGENT_TOKEN: ${RUNLABQA_AGENT_TOKEN:-}
     ports:
       - "${API_PORT:-3001}:3001"
     volumes:

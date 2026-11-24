@@ -76,6 +76,11 @@ export const sidebarData: SidebarData = {
           icon: Container,
         },
         {
+          title: 'Flujo del agente',
+          url: '/agent-flow',
+          icon: Workflow,
+        },
+        {
           title: 'Calendarización',
           url: '/schedules',
           icon: CalendarClock,

@@ -121,6 +121,19 @@ export function DockerStatusPanel({
               <dd className='truncate font-mono text-xs' title={String(status.projectPath ?? '')}>
                 {status.projectPath ? String(status.projectPath) : '—'}
               </dd>
+              <dt className='text-muted-foreground'>Workstation</dt>
+              <dd className='font-mono text-xs'>
+                {status.workstationId ? String(status.workstationId) : '—'}
+              </dd>
+              <dt className='text-muted-foreground'>Agente</dt>
+              <dd className='flex items-center gap-1'>
+                {status.workstationId && !statusError ? (
+                  <CheckCircle2 className='size-3.5 text-emerald-500' />
+                ) : (
+                  <XCircle className='size-3.5 text-muted-foreground' />
+                )}
+                {status.workstationId ? 'Conectado' : 'Sin asignar'}
+              </dd>
               <dt className='text-muted-foreground'>Grid Selenium</dt>
               <dd className='flex items-center gap-1'>
                 {status.gridUp ? (

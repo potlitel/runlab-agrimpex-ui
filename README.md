@@ -9,6 +9,7 @@ Frontend del dashboard QA **RunLab Agrimpex** para gestionar perfiles, configura
 ## Índice
 
 - [Arquitectura](#arquitectura)
+- [Arquitectura distribuida del módulo Docker](#arquitectura-distribuida-del-módulo-docker)
 - [Requisitos](#requisitos)
 - [Ejecución manual](#ejecución-manual)
 - [Ejecución con Docker](#ejecución-con-docker)
@@ -39,6 +40,128 @@ runlab-agrimpex-api (Express + Socket.io, :3001)
 - En desarrollo, Vite hace proxy de `/api` y `/socket.io` hacia `http://localhost:3001`.
 - En producción, el backend sirve el `dist` del frontend.
 - La sesión de trabajo opera por **perfil activo** (sin autenticación en esta etapa): la UI envía `X-Profile-Id` y se suscribe a la sala Socket.io `profile:<id>`.
+- El módulo Docker **no se ejecuta en el servidor central**: se ejecuta en la workstation asignada al perfil, mediante un agente. Ver [Arquitectura distribuida del módulo Docker](#arquitectura-distribuida-del-módulo-docker).
+
+## Arquitectura distribuida del módulo Docker
+
+La UI está centralizada, pero el Docker que inspecciona el panel es **el de la workstation del perfil**, no el del servidor donde corre la API. El socket del daemon nunca sale de la workstation.
+
+```text
+Workstation A ── agente (WebSocket saliente + token) ──┐
+Workstation B ── agente ───────────────────────────────┼── API central ── Socket.io ── UI
+Workstation C ── agente ───────────────────────────────┘
+```
+
+El agente ejecuta `check / status / containers / run / stop / start / ensureGrid` localmente y streams los logs por el mismo canal. La API deja de spawnear `docker` y solo enruta por `agentId/profileId` (también en las calendarizaciones con Docker). El perfil pasa a tener un `workstationId` en vez de un `projectPath` que hoy solo existe en el host donde corre la API. Así la frase queda literal: **UI centralizada, Docker de cada workstation, socket nunca sale de la workstation**.
+
+> [!IMPORTANT]
+> ### ¿Quién es el agente?
+>
+> **No es un servicio web.** No abre puerto, no escucha HTTP, no está en `docker compose` y nadie le habla directamente. Es un **proceso Node de larga duración** — un worker/CLI — que corre en cada workstation con `node agent/index.js`.
+>
+> Lo que hace es:
+>
+> 1. Al arrancar, **marca hacia fuera** por Socket.io a `RUNLABQA_AGENT_URL` y se autentica con `agentId` + token.
+> 2. Se registra en el `agentRegistry` de la API y se queda esperando `agent:command`.
+> 3. Ejecuta la orden **localmente** reutilizando `services/dockerRunner.js` (el mismo código que antes usaba la API) — ahí es donde se spawnea `docker` / `docker compose`.
+> 4. Devuelve `agent:result` y va emitiendo `agent:event` con los logs, que la API reenvía a la sala `profile:<id>`.
+>
+> |                | Agente                                    | API central                        |
+> | -------------- | ----------------------------------------- | ---------------------------------- |
+> | Rol            | la «mano» en la workstation               | enrutador, registro, persistencia  |
+> | Red            | conexión saliente, sin puertos abiertos   | escucha HTTP + Socket.io           |
+> | Estado         | stateless, solo `requestId`               | registry + perfiles + reportes     |
+> | Arranque       | systemd / NSSM / supervisor               | contenedor del stack               |
+>
+> Se le dice «servicio» porque conviene registrarlo como servicio del SO para que arranque solo, pero **arquitectónicamente es un cliente, no un servidor**. Eso es justo lo que permite tener workstations detrás de NAT/firewall y sin IP pública: solo la API necesita ser alcanzable. Socket.io reconecta sola ante cortes; el supervisor del SO se encarga si el proceso muere.
+
+### Contrato agente ↔ API
+
+| Elemento | Contrato |
+|---|---|
+| Registro | Conexión Socket.io **saliente** del agente con `auth: { role: 'agent', agentId, token }`; se une a la sala `agent:<agentId>`. |
+| Comando | `agent:command` con `{ requestId, op, profile, args }`, donde `profile` incluye `id` y el `projectPath` de la workstation, y `args` los parámetros (p. ej. `{ action: 'up-build' }`). |
+| Progreso | `agent:event` con `{ requestId, event, payload }`; la API lo reemite al room `profile:<id>` como `docker:started`, `docker:log`, `docker:exit` y `profiles:status`. La UI no cambia de eventos. |
+| Resultado | `agent:result` con `{ requestId, ok, data, error }`. Resuelve la petición REST que espera respuesta; timeout de 15 s. |
+| Operaciones | `check`, `status`, `containers`, `run` (whitelist de acciones de compose), `stop`, `start`, `report` y `ensureGrid` (usado por el scheduler). |
+| Agentes conectados | `GET /api/docker/agents` devuelve `{ agents: [{ agentId, label, connectedAt }] }`. |
+
+### Configuración
+
+| Variable / campo | Dónde | Efecto |
+|---|---|---|
+| `workstationId` | `profiles/<id>/config.json` (Ajustes > Proyecto) | Agente que atiende el perfil. Sin él, `/api/docker/*` responde `400`. |
+| `projectPath` | `profiles/<id>/config.json` | Ruta **dentro de la workstation**, usada como `cwd` por el agente. |
+| `RUNLABQA_AGENT_TOKEN` | entorno de la API y del agente | Token compartido; sin él la API rechaza conexiones de agentes (fail closed). |
+| `RUNLABQA_AGENT_URL` | entorno del agente | URL pública de la API central (`https://…`). |
+| `RUNLABQA_AGENT_ID` | entorno del agente | Identificador que debe coincidir con `workstationId`. |
+| `RUNLABQA_AGENT_LABEL` | entorno del agente | Etiqueta legible para `/api/docker/agents`. |
+| `RUNLABQA_DOCKER_TRANSPORT` | entorno de la API | `agent` (default) o `local` (modo legado: la API ejecuta `docker` en su propio host, solo para desarrollo). |
+| `NODE_USE_ENV_PROXY` | entorno del agente | Si está activo, el agente se relanza sin él para que Socket.io no pase por el proxy corporativo; `HTTP_PROXY`/`HTTPS_PROXY` siguen disponibles para Docker. |
+
+En el despliegue centralizado, `VITE_API_URL` y `VITE_SOCKET_URL` deben apuntar a la URL pública (no `localhost`) y reconstruir la UI; ver [Variables horneadas](#3-variables-horneadas-importante).
+
+### Seguridad
+
+`/var/run/docker.sock` es control total del daemon, que corre como root: quien lo puede usar puede montar `/` y obtener root del host. El agente tiene ese poder **en su propia workstation**, por diseño; la API central no monta ningún socket. Por eso el canal exige token, las acciones de compose están limitadas a una whitelist (`up-selenium`, `up-build`, `rebuild`, `down`, `down-all`) y cada comando queda trazado con su `requestId`. En entorno multiusuario, la autorización *qué usuario puede controlar qué workstation* debe resolverse con la capa de autenticación del dashboard (hoy inexistente).
+
+### Operación y verificación
+
+#### ¿Qué es realmente el agente?
+
+No es un servicio web: **no abre ningún puerto, no escucha HTTP y no forma parte de `docker compose`**. Es un **proceso Node de larga duración** (un worker/CLI) que se instala y ejecuta en cada workstation con `node agent/index.js`. Arquitectónicamente es un **cliente Socket.io saliente** de la API central: al arrancar se conecta a `RUNLABQA_AGENT_URL`, se autentica con `auth: { role: 'agent', agentId, token }`, se registra en `agentRegistry` y se queda a la espera de `agent:command`.
+
+| Aspecto | Agente | API central |
+|---|---|---|
+| Rol | Ejecutor remoto (la «mano» en la workstation) | Enrutador, registro y persistencia |
+| Red | Conexión **saliente**; sin puertos abiertos | Escucha HTTP + Socket.io |
+| Estado | Stateless; solo correlaciona `requestId` | Registry en memoria + perfiles/reportes |
+| Código | Reutiliza `services/dockerRunner.js` del repo de la API | Orquesta y publica eventos en `profile:<id>` |
+| Arranque | Proceso del SO (systemd / NSSM / supervisor) | Contenedor del stack |
+
+Se le suele llamar «servicio» porque conviene registrarlo como servicio del sistema para que arranque automáticamente, pero **no es un servidor**: nadie le habla directamente. Toda la comunicación la inicia él hacia fuera, lo que permite workstations detrás de NAT/firewall y sin IP pública. Si el proceso muere, el supervisor lo relanza; Socket.io ya reconecta sola ante cortes de red.
+
+El daemon Docker (`/var/run/docker.sock`) sigue siendo local a la workstation: el agente es el único que habla con él, con los privilegios del usuario que lo ejecuta (en la práctica, root-equivalente por diseño).
+
+La UI trae una vista didáctica en **`/agent-flow`** («Flujo del agente», enlazada desde `/docker` y el sidebar), con el mismo estilo animado que `/live-flow`: muestra el registro saliente, el comando, la ejecución local, el streaming de eventos y el siguiente slice. Es **híbrida**: si `GET /api/docker/agents` responde, resalta los agentes reales y el `workstationId` del perfil; si no, sigue funcionando como simulación.
+
+#### Para ponerlo en marcha
+
+1. Pon `RUNLABQA_AGENT_TOKEN=<token>` en el `.env` de la API y reconstruye el stack.
+2. Arranca el agente en cada workstation con `RUNLABQA_AGENT_URL`, `RUNLABQA_AGENT_ID` y el mismo token.
+3. Asigna ese ID en **Ajustes > Proyecto > Workstation / agente Docker** del perfil.
+
+```bash
+# En cada workstation (repo runlab-agrimpex-api):
+RUNLABQA_AGENT_URL=https://dashboard.example.com \
+RUNLABQA_AGENT_ID=ws-a \
+RUNLABQA_AGENT_TOKEN=<token> \
+node agent/index.js
+
+# Desde cualquier navegador con la UI desplegada:
+curl -H 'X-Profile-Id: <id>' https://dashboard.example.com/api/docker/agents
+```
+
+El panel `/docker` muestra la workstation asignada y si su agente está conectado.
+
+Dos puntos que conviene tener presentes: el agente tiene **root en su workstation** por diseño (el socket no sale de ahí), y la **ejecución de Playwright sigue ocurriendo donde corre la API** — mover también las suites al agente sería el siguiente slice.
+
+#### Por qué funciona hoy y cuándo dejaría de funcionar
+
+Hoy `profiles/perfil-1/config.json` tiene `projectPath=/home/potlitel/Trabajo/EICMA/Agrimpex/playwright-kit-profesional` y `docker-compose.yml` monta **ese mismo directorio del host en la misma ruta absoluta** dentro del contenedor de la API. Por eso `npx playwright` (que se lanza con `cwd: projectPath`) y el colector de tests encuentran la suite aunque el proceso corra dentro de Docker; los reportes se escriben en `profiles/<id>/reports`, también montado desde el host.
+
+Esto vale solo mientras la API corra en ese host. Si la API se traslada a un servidor central, ese bind mount es local al servidor: la ruta `/home/potlitel/...` ya no contendrá la suite y `/api/tests/*` fallará **aunque el agente Docker de la workstation esté conectado**. Para centralizar de verdad hay que añadir al agente las operaciones `collect` / `runTests` y devolver el JSON del reporte y los artefactos (screenshots, trace, video, `playwright-report`) a la API central. Hasta entonces no borres `projectPath` del perfil: el agente lo usa como `cwd` para compose y la API lo usa para Playwright.
+
+Si quieres volver al modo anterior mientras tanto: `RUNLABQA_DOCKER_TRANSPORT=local` en el `.env` de la API y se recrea el contenedor; el campo `workstationId` se ignora en ese modo.
+
+#### Evolución prevista: transporte híbrido por perfil
+
+El estado final es una API y una UI centralizadas que atiendan tanto suites que viven en el servidor como suites que viven en workstations. El criterio debe ser **por perfil**, no global:
+
+- Perfil **con** `workstationId` → el agente ejecuta Docker y, en el siguiente slice, también `collect` / `runTests`; el servidor solo enruta y recibe el reporte y los artefactos.
+- Perfil **sin** `workstationId` → se mantiene `projectPath` local y la API ejecuta Docker y Playwright en el servidor (equivalente al modo `local` de hoy).
+
+Así `projectPath` no desaparece: pasa a ser la ruta válida **en el equipo que ejecuta ese perfil**, y `workstationId` decide en cuál. Hoy `RUNLABQA_DOCKER_TRANSPORT` es un interruptor global; el cambio consiste en hacerlo efectivo por perfil y añadir las operaciones de Playwright al agente.
 
 ## Requisitos
 
@@ -319,7 +442,7 @@ El kit de tests ya está montado en su ruta original, así que los perfiles cons
 - **Reportes (`/reports`)**: historial, analítica y detalle de ejecuciones. El historial incluye una **miniatura de evidencia** por reporte (cuando el run genera imagen/`summary.previewImage`) y el detalle permite visualizar adjuntos/evidencias de imagen por test.
 - **Evidencia de fallos (`/errors`)**: galería de capturas/evidencias generadas durante corridas.
 - **Entornos (`/env`)**: edición de archivos `.env` del proyecto y entornos/variables guardados por perfil.
-- **Docker (`/docker`)**: estado del entorno Docker/grid y acciones asociadas.
+- **Docker (`/docker`)**: estado del Docker de la **workstation asignada al perfil** (agente conectado, grid, contenedores y diagnóstico) y acciones asociadas. Ver [Arquitectura distribuida del módulo Docker](#arquitectura-distribuida-del-módulo-docker).
 - **Calendarización (`/schedules`)**: programación de ejecuciones automáticas.
 - **Datos de prueba (`/data`)**: fuentes de datos TXT/JSON (según módulos habilitados).
 - **Ajustes (`/settings`)**: configuración de proyecto/rutas, módulos (feature flags), automatización, perfiles y sistema. Incluye la tarjeta **Evidencias de ejecución (Playwright)** para controlar capturas (screenshot/video/trace y página completa) por perfil.
@@ -480,4 +603,4 @@ src/
 ## Notas
 
 - Los módulos disponibles pueden variar según los **feature flags** del perfil activo.
-- Algunas capacidades (ejecución real, Docker, rutas locales) dependen de la configuración del perfil y del entorno donde corre la API.
+- Las capacidades Docker dependen del perfil y de que su **agente de workstation** esté conectado; las rutas locales (`projectPath`) se resuelven en la workstation, no en el servidor. Ver [Arquitectura distribuida del módulo Docker](#arquitectura-distribuida-del-módulo-docker).

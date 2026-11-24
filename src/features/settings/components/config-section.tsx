@@ -96,7 +96,7 @@ function ConfigForm({ initial, settings }: { initial: Config; settings: UseConfi
         <CardHeader>
           <CardTitle>Proyecto y rutas</CardTitle>
           <CardDescription>
-            Configura las rutas del proyecto de pruebas, archivos de entorno y fuentes de datos.
+            Configura las rutas del proyecto de pruebas, la workstation que ejecutará Docker y las fuentes de datos.
           </CardDescription>
         </CardHeader>
         <CardContent className='space-y-4'>
@@ -109,6 +109,19 @@ function ConfigForm({ initial, settings }: { initial: Config; settings: UseConfi
             browsing={settings.browsing === 'folder'}
             placeholder='/ruta/al/proyecto'
           />
+          <div className='space-y-1.5'>
+            <Label htmlFor='workstationId'>Workstation / agente Docker</Label>
+            <Input
+              id='workstationId'
+              value={form.workstationId ?? ''}
+              onChange={(e) => set('workstationId', e.target.value)}
+              placeholder='ws-a'
+            />
+            <p className='text-xs text-muted-foreground'>
+              ID del agente que ejecutará Docker en la workstation. Debe coincidir con{' '}
+              <code>RUNLABQA_AGENT_ID</code>. La ruta del proyecto se resuelve allí, no en el servidor.
+            </p>
+          </div>
           <div className='grid gap-4 md:grid-cols-[1fr_auto_auto] md:items-end'>
             <div className='space-y-1.5'>
               <Label htmlFor='envPath'>Archivo .env</Label>

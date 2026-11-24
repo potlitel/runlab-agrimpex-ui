@@ -94,6 +94,7 @@ export interface EvidenceConfig {
 
 export interface Config {
   projectPath?: string
+  workstationId?: string
   envPath?: string
   playwrightCmd?: string
   pytestCmd?: string
@@ -437,7 +438,14 @@ export interface DockerStatus {
   gridUp?: unknown
   projectUp?: unknown
   hasReport?: boolean
+  workstationId?: string
+  transport?: 'agent' | 'local'
   [key: string]: unknown
+}
+
+export interface DockerAgentsResponse {
+  agents: Array<{ agentId: string; label?: string; connectedAt?: string }>
+  transport?: 'agent' | 'local'
 }
 
 export interface DockerCheckResponse {

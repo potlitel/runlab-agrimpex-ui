@@ -1,4 +1,5 @@
-import { Container, ExternalLink, RefreshCw } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { Container, ExternalLink, RefreshCw, Workflow } from 'lucide-react'
 import { dockerApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -45,6 +46,11 @@ function DockerPageView({ profileName }: { profileName?: string }) {
           </div>
           <div className='ms-auto flex items-center gap-2'>
             <ProfileHeaderBadge profileName={profileName} />
+            <Button size='sm' variant='outline' asChild>
+              <Link to='/agent-flow'>
+                <Workflow className='size-4' /> Flujo del agente
+              </Link>
+            </Button>
             <Button size='sm' variant='outline' onClick={docker.refresh}>
               <RefreshCw className='size-4' /> Actualizar
             </Button>

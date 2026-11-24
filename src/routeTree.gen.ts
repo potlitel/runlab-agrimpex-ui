@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AgentFlowRouteImport } from './routes/agent-flow'
 import { Route as DataRouteImport } from './routes/data'
 import { Route as DockerRouteImport } from './routes/docker'
 import { Route as EnvRouteImport } from './routes/env'
@@ -29,6 +30,11 @@ import { Route as errors503RouteImport } from './routes/(errors)/503'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentFlowRoute = AgentFlowRouteImport.update({
+  id: '/agent-flow',
+  path: '/agent-flow',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DataRoute = DataRouteImport.update({
@@ -109,6 +115,7 @@ const errors503Route = errors503RouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agent-flow': typeof AgentFlowRoute
   '/data': typeof DataRoute
   '/docker': typeof DockerRoute
   '/env': typeof EnvRoute
@@ -127,6 +134,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agent-flow': typeof AgentFlowRoute
   '/data': typeof DataRoute
   '/docker': typeof DockerRoute
   '/env': typeof EnvRoute
@@ -146,6 +154,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agent-flow': typeof AgentFlowRoute
   '/data': typeof DataRoute
   '/docker': typeof DockerRoute
   '/env': typeof EnvRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agent-flow'
     | '/data'
     | '/docker'
     | '/env'
@@ -184,6 +194,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agent-flow'
     | '/data'
     | '/docker'
     | '/env'
@@ -202,6 +213,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/agent-flow'
     | '/data'
     | '/docker'
     | '/env'
@@ -221,6 +233,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgentFlowRoute: typeof AgentFlowRoute
   DataRoute: typeof DataRoute
   DockerRoute: typeof DockerRoute
   EnvRoute: typeof EnvRoute
@@ -245,6 +258,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agent-flow': {
+      id: '/agent-flow'
+      path: '/agent-flow'
+      fullPath: '/agent-flow'
+      preLoaderRoute: typeof AgentFlowRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/data': {
@@ -357,6 +377,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgentFlowRoute: AgentFlowRoute,
   DataRoute: DataRoute,
   DockerRoute: DockerRoute,
   EnvRoute: EnvRoute,

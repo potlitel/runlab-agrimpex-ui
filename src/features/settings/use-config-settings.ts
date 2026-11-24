@@ -12,6 +12,7 @@ function msg(error: unknown, fallback: string) {
 
 const EMPTY: Config = {
   projectPath: '',
+  workstationId: '',
   envPath: '',
   playwrightCmd: '',
   pytestCmd: 'pytest',
