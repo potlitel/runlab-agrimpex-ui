@@ -85,3 +85,14 @@
     height: 0;
   }
 }
+
+/* Brillo del badge de MCP detectado en el dashboard de ejecución. */
+@keyframes mcp-shine {
+  0% {
+    transform: translateX(-120%);
+  }
+  60%,
+  100% {
+    transform: translateX(120%);
+  }
+}

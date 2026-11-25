@@ -15,9 +15,12 @@ import {
   RefreshCw,
   Terminal,
 } from 'lucide-react'
+import { m, useAnimationControls } from 'motion/react'
+import { DURATION, EASE_OUT, fadeUp, staggerContainer } from '@/lib/motion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { AnimatedNumber } from '@/components/motion/animated-number'
 import type { ExecutionLogEntry, ExecutionProgress } from '../use-execution'
 import { ExecutionEmptyState } from './execution-empty-state'
 
@@ -33,6 +36,8 @@ export type ExecutionConsoleProps = {
   onClear?: () => void
   onRetry?: () => void
 }
+
+const MILESTONES = [25, 50, 75, 100] as const
 
 const logTone: Record<ExecutionLogEntry['kind'], string> = {
   info: 'text-zinc-400',
@@ -64,10 +69,25 @@ export function ExecutionConsole({
   onRetry,
 }: ExecutionConsoleProps) {
   const endRef = useRef<HTMLDivElement>(null)
+  const percentageControls = useAnimationControls()
+  const previousPercentage = useRef(progress.percentage)
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
   }, [logs])
+
+  useEffect(() => {
+    const previous = previousPercentage.current
+    previousPercentage.current = progress.percentage
+    const reached = MILESTONES.find(
+      (milestone) => previous < milestone && progress.percentage >= milestone
+    )
+    if (reached === undefined) return
+    void percentageControls.start({
+      scale: [1, 1.08, 1],
+      transition: { duration: 0.45, ease: 'easeOut' },
+    })
+  }, [percentageControls, progress.percentage])
 
   return (
     <Card className='flex min-h-0 flex-col'>
@@ -103,9 +123,15 @@ export function ExecutionConsole({
             <span className='text-muted-foreground tabular-nums'>
               {progress.current}/{progress.total || 0}
             </span>
-            <span className='font-semibold tabular-nums'>
-              {progress.percentage}%
-            </span>
+            <m.span
+              animate={percentageControls}
+              className='inline-flex font-semibold tabular-nums'
+            >
+              <AnimatedNumber
+                value={progress.percentage}
+                format={(value) => `${Math.round(value)}%`}
+              />
+            </m.span>
             {onClear && (
               <Button
                 variant='ghost'
@@ -137,7 +163,12 @@ export function ExecutionConsole({
           />
         </div>
         {summary && (
-          <div className='mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 xl:grid-cols-7'>
+          <m.div
+            variants={staggerContainer}
+            initial='hidden'
+            animate='show'
+            className='mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 xl:grid-cols-7'
+          >
             <SummaryPill
               icon={Activity}
               label='Total'
@@ -181,10 +212,11 @@ export function ExecutionConsole({
             <SummaryPill
               icon={Percent}
               label='Tasa de éxito'
-              value={`${passRate}%`}
+              value={passRate}
+              format={(value) => `${Math.round(value)}%`}
               tone='text-foreground'
             />
-          </div>
+          </m.div>
         )}
       </CardHeader>
       <CardContent className='min-h-0 flex-1 p-0'>
@@ -237,12 +269,18 @@ export function ExecutionConsole({
           ) : (
             <div className='space-y-1'>
               {logs.map((entry) => (
-                <div key={entry.id} className='flex gap-2'>
+                <m.div
+                  key={entry.id}
+                  initial={{ opacity: 0, x: -4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: DURATION.fast, ease: EASE_OUT }}
+                  className='flex gap-2'
+                >
                   <span className='shrink-0 text-muted-foreground/70'>
                     {formatTime(entry.at)}
                   </span>
                   <span className={logTone[entry.kind]}>{entry.text}</span>
-                </div>
+                </m.div>
               ))}
               <div ref={endRef} />
             </div>
@@ -258,19 +296,28 @@ function SummaryPill({
   label,
   value,
   tone,
+  format,
 }: {
   icon: ComponentType<{ className?: string }>
   label: string
   value: string | number
   tone: string
+  format?: (value: number) => string
 }) {
   return (
-    <div className='flex items-center gap-2 rounded-md border bg-card px-2 py-1.5'>
+    <m.div
+      variants={fadeUp}
+      className='flex items-center gap-2 rounded-md border bg-card px-2 py-1.5'
+    >
       <Icon className={`size-3.5 ${tone}`} />
       <span className='text-muted-foreground'>{label}</span>
       <span className={`ms-auto font-semibold tabular-nums ${tone}`}>
-        {value}
+        {typeof value === 'number' ? (
+          <AnimatedNumber value={value} format={format} />
+        ) : (
+          value
+        )}
       </span>
-    </div>
+    </m.div>
   )
 }

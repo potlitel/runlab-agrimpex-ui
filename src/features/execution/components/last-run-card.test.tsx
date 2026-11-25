@@ -94,7 +94,11 @@ describe('LastRunCard', () => {
     renderCard()
 
     expect(screen.getByText('Completada')).toBeTruthy()
+    expect(screen.getByText('4')).toBeTruthy()
+    expect(screen.getByText('3')).toBeTruthy()
+    expect(screen.getByText('1')).toBeTruthy()
     expect(screen.getByText('8.4s')).toBeTruthy()
+    expect(screen.getByText('75%')).toBeTruthy()
     expect(
       screen.getByRole('link', { name: 'JSON' }).getAttribute('href')
     ).toBe('/api/reports/report-1/json')

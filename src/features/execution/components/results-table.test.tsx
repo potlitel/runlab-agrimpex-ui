@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { shouldFlashStatus } from '../results-motion'
 import type { ExecutionTestResult } from '../use-execution'
 import { ResultsTable } from './results-table'
 
@@ -170,5 +171,40 @@ describe('ResultsTable', () => {
 
     expect(screen.getByText('Sin salida ni adjuntos')).toBeTruthy()
     expect(screen.queryByText(/Evidencias/)).toBeNull()
+  })
+
+  it('marca de entrada solo a la fila nueva, no a las ya visibles', () => {
+    const { rerender } = render(<ResultsTable results={makeResults(1)} />)
+
+    expect(
+      screen.getByText('caso-0').closest('tr')?.getAttribute('data-entry')
+    ).toBe('new')
+
+    rerender(<ResultsTable results={makeResults(2)} />)
+
+    expect(
+      screen.getByText('caso-0').closest('tr')?.getAttribute('data-entry')
+    ).toBe('known')
+    expect(
+      screen.getByText('caso-1').closest('tr')?.getAttribute('data-entry')
+    ).toBe('new')
+  })
+})
+
+describe('shouldFlashStatus', () => {
+  it('destella una sola vez cuando un test pasa de running a terminal', () => {
+    expect(shouldFlashStatus('running', 'passed')).toBe(true)
+    expect(shouldFlashStatus('running', 'failed')).toBe(true)
+    expect(shouldFlashStatus('running', 'error')).toBe(true)
+  })
+
+  it('no destella en la carga inicial ni en filas ya terminales', () => {
+    expect(shouldFlashStatus(undefined, 'passed')).toBe(false)
+    expect(shouldFlashStatus(undefined, 'failed')).toBe(false)
+    expect(shouldFlashStatus('running', 'running')).toBe(false)
+    expect(shouldFlashStatus('running', 'skipped')).toBe(false)
+    expect(shouldFlashStatus('passed', 'failed')).toBe(false)
+    expect(shouldFlashStatus('failed', 'passed')).toBe(false)
+    expect(shouldFlashStatus('skipped', 'passed')).toBe(false)
   })
 })

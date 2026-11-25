@@ -18,6 +18,8 @@ import {
   Terminal,
   Users,
 } from 'lucide-react'
+import { AnimatePresence, m } from 'motion/react'
+import { collapse, fadeIn, fadeUp, staggerContainer } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -25,14 +27,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import type { LastRunOptions } from '../use-execution'
 import { ExecutionEmptyState } from './execution-empty-state'
 import { contextFrom, useProjectConfig } from './project-context'
-
-const MCP_STYLE = `
-  @keyframes mcp-shine {
-    0% { transform: translateX(-120%); }
-    60% { transform: translateX(120%); }
-    100% { transform: translateX(120%); }
-  }
-`
 
 function mcpBadge(config: Config | undefined) {
   if (!config?.projectFeatures?.mcp?.detected) return null
@@ -91,7 +85,8 @@ function ContextValue({
   mono?: boolean
 }) {
   return (
-    <div
+    <m.div
+      variants={fadeUp}
       className={cn(
         'flex min-w-0 items-center gap-2 rounded-md border px-2.5 py-2 text-xs',
         present ? 'border-emerald-500/30 bg-emerald-500/5' : 'bg-muted/20'
@@ -130,7 +125,7 @@ function ContextValue({
           className='ms-auto size-3.5 shrink-0 text-muted-foreground'
         />
       )}
-    </div>
+    </m.div>
   )
 }
 
@@ -178,100 +173,148 @@ export function ProjectContextCard({
                 </Badge>
               )}
             </div>
-            {configQuery.isError ? (
-              <div className='flex flex-wrap items-center gap-2 text-xs text-destructive'>
-                <span>
-                  {configQuery.error?.message ??
-                    'No se pudo consultar la configuración del proyecto.'}
-                </span>
-                <Button
-                  variant='link'
-                  size='sm'
-                  className='h-auto p-0'
-                  onClick={() => void configQuery.refetch()}
-                  disabled={configQuery.isFetching}
+            <AnimatePresence mode='wait' initial={false}>
+              {configQuery.isError ? (
+                <m.div
+                  key='error'
+                  variants={collapse}
+                  initial='hidden'
+                  animate='show'
+                  exit='exit'
+                  className='overflow-hidden'
                 >
-                  <RefreshCw className='size-3.5' /> Reintentar
-                </Button>
-                <Button variant='link' size='sm' className='h-auto p-0' asChild>
-                  <Link to='/settings'>
-                    <Settings className='size-3.5' /> Ir a Ajustes
-                  </Link>
-                </Button>
-              </div>
-            ) : (
-              <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-3'>
-                <ContextValue
-                  icon={FolderOpen}
-                  label='Proyecto'
-                  value={context.projectPath || 'No registrado'}
-                  present={context.configured}
-                  mono
-                />
-                <ContextValue
-                  icon={Layers}
-                  label='Entorno'
-                  value={context.environment ?? 'No registrado en esta corrida'}
-                  present={!!context.environment}
-                  mono
-                />
-                <ContextValue
-                  icon={Container}
-                  label='Docker'
-                  value={
-                    context.useDocker === undefined
-                      ? 'No registrado'
-                      : context.useDocker
-                        ? 'Sí'
-                        : 'No'
-                  }
-                  present={context.useDocker !== undefined}
-                />
-                <ContextValue
-                  icon={Users}
-                  label='Workers'
-                  value={context.workers ?? 'No registrado'}
-                  present={context.workers !== undefined}
-                  mono
-                />
-                <ContextValue
-                  icon={Filter}
-                  label='Grep'
-                  value={context.grep || 'No registrado'}
-                  present={!!context.grep}
-                  mono
-                />
-                <ContextValue
-                  icon={Terminal}
-                  label='Comando'
-                  value={context.command || '—'}
-                  present={!!context.command}
-                  mono
-                />
-                {context.paramsCount !== undefined && (
-                  <ContextValue
-                    icon={Sparkles}
-                    label='Parámetros'
-                    value={context.paramsCount}
-                    present
+                  <m.div
+                    variants={fadeIn}
+                    initial='hidden'
+                    animate='show'
+                    className='flex flex-wrap items-center gap-2 text-xs text-destructive'
+                  >
+                    <span>
+                      {configQuery.error?.message ??
+                        'No se pudo consultar la configuración del proyecto.'}
+                    </span>
+                    <Button
+                      variant='link'
+                      size='sm'
+                      className='h-auto p-0'
+                      onClick={() => void configQuery.refetch()}
+                      disabled={configQuery.isFetching}
+                    >
+                      <RefreshCw className='size-3.5' /> Reintentar
+                    </Button>
+                    <Button
+                      variant='link'
+                      size='sm'
+                      className='h-auto p-0'
+                      asChild
+                    >
+                      <Link to='/settings'>
+                        <Settings className='size-3.5' /> Ir a Ajustes
+                      </Link>
+                    </Button>
+                  </m.div>
+                </m.div>
+              ) : (
+                <m.div
+                  key='context'
+                  variants={collapse}
+                  initial='hidden'
+                  animate='show'
+                  exit='exit'
+                  className='overflow-hidden'
+                >
+                  <m.div
+                    className='grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-3'
+                    variants={staggerContainer}
+                    initial='hidden'
+                    animate='show'
+                  >
+                    <ContextValue
+                      icon={FolderOpen}
+                      label='Proyecto'
+                      value={context.projectPath || 'No registrado'}
+                      present={context.configured}
+                      mono
+                    />
+                    <ContextValue
+                      icon={Layers}
+                      label='Entorno'
+                      value={
+                        context.environment ?? 'No registrado en esta corrida'
+                      }
+                      present={!!context.environment}
+                      mono
+                    />
+                    <ContextValue
+                      icon={Container}
+                      label='Docker'
+                      value={
+                        context.useDocker === undefined
+                          ? 'No registrado'
+                          : context.useDocker
+                            ? 'Sí'
+                            : 'No'
+                      }
+                      present={context.useDocker !== undefined}
+                    />
+                    <ContextValue
+                      icon={Users}
+                      label='Workers'
+                      value={context.workers ?? 'No registrado'}
+                      present={context.workers !== undefined}
+                      mono
+                    />
+                    <ContextValue
+                      icon={Filter}
+                      label='Grep'
+                      value={context.grep || 'No registrado'}
+                      present={!!context.grep}
+                      mono
+                    />
+                    <ContextValue
+                      icon={Terminal}
+                      label='Comando'
+                      value={context.command || '—'}
+                      present={!!context.command}
+                      mono
+                    />
+                    {context.paramsCount !== undefined && (
+                      <ContextValue
+                        icon={Sparkles}
+                        label='Parámetros'
+                        value={context.paramsCount}
+                        present
+                      />
+                    )}
+                  </m.div>
+                </m.div>
+              )}
+            </AnimatePresence>
+            <AnimatePresence initial={false}>
+              {!context.configured && !configQuery.isError && (
+                <m.div
+                  key='empty'
+                  variants={collapse}
+                  initial='hidden'
+                  animate='show'
+                  exit='exit'
+                  className='overflow-hidden'
+                >
+                  <ExecutionEmptyState
+                    icon={FolderOpen}
+                    title='Proyecto sin configurar'
+                    description='Configura la ruta del proyecto para habilitar la ejecución y la exploración de archivos.'
+                    action={
+                      <Button variant='outline' size='sm' asChild>
+                        <Link to='/settings'>
+                          <Settings className='size-4' /> Configurar Proyecto
+                        </Link>
+                      </Button>
+                    }
                   />
-                )}
-              </div>
-            )}
-            {!context.configured && !configQuery.isError && (
-              <ExecutionEmptyState
-                icon={FolderOpen}
-                title='Proyecto sin configurar'
-                description='Configura la ruta del proyecto para habilitar la ejecución y la exploración de archivos.'
-                action={
-                  <Button variant='outline' size='sm' asChild>
-                    <Link to='/settings'>
-                      <Settings className='size-4' /> Configurar Proyecto
-                    </Link>
-                  </Button>
-                }
-              />
-            )}
+                </m.div>
+              )}
+            </AnimatePresence>
             <div className='flex flex-wrap items-center justify-between gap-2 border-t pt-2'>
               <span className='text-xs text-muted-foreground'>
                 Las corridas se inician desde Tests.
@@ -284,7 +327,6 @@ export function ProjectContextCard({
             </div>
           </CardContent>
         </Card>
-        {context.mcpDetected && <style>{MCP_STYLE}</style>}
       </>
     )
   }
@@ -387,7 +429,6 @@ export function ProjectContextCard({
           </div>
         </CardContent>
       </Card>
-      {context.mcpDetected && <style>{MCP_STYLE}</style>}
       {selectedFiles.length > 0 && (
         <span className='sr-only'>
           Archivos seleccionados: {selectedFiles.join(', ')}

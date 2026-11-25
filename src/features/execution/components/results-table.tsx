@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { EvidenceItem, EvidenceKind } from '@/types/contract'
 import {
@@ -14,12 +14,14 @@ import {
   RefreshCw,
   Search,
 } from 'lucide-react'
+import { AnimatePresence, m, useAnimationControls } from 'motion/react'
 import { reportsApi } from '@/lib/api'
 import {
   normalizeCaptureOrigin,
   normalizeEvidenceMetadata,
   normalizeEvidenceStatus,
 } from '@/lib/evidence'
+import { DURATION, EASE_OUT, collapse } from '@/lib/motion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,6 +42,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { EvidenceDialog } from '@/features/errors/components/evidence-viewer'
+import { shouldFlashStatus } from '../results-motion'
 import {
   selectResultGroups,
   type ResultSort,
@@ -176,6 +179,11 @@ export function ResultsTable({
     items: EvidenceItem[]
     index: number
   } | null>(null)
+  const seenIds = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    Object.keys(results).forEach((id) => seenIds.current.add(id))
+  }, [results])
 
   const groups = selectResultGroups(results, {
     query,
@@ -206,79 +214,23 @@ export function ResultsTable({
   }
 
   function renderRow(result: ExecutionTestResult) {
-    const output = result.errorMsg || result.output || ''
-    const attachments = (result.attachments ?? [])
-      .map((attachment) => toEvidenceItem(attachment, reportId, result))
-      .filter((item): item is EvidenceItem => item !== null)
-    const hasOutput = !!output.trim()
-
     return (
-      <TableRow key={result.id}>
-        <TableCell className='max-w-[320px]'>
-          <span className='block truncate font-mono text-xs'>
-            {result.id.split('::').slice(1).join(' :: ') || result.id}
-          </span>
-          <span className='block truncate text-xs text-muted-foreground'>
-            {result.id.split('::')[0]}
-          </span>
-        </TableCell>
-        <TableCell>
-          <Badge variant={statusVariant(result.status)}>
-            {statusLabels[result.status] ?? result.status}
-          </Badge>
-        </TableCell>
-        <TableCell className='text-end tabular-nums'>
-          {result.duration !== undefined
-            ? `${result.duration.toFixed(2)}s`
-            : '—'}
-        </TableCell>
-        <TableCell className='max-w-[360px]'>
-          <div className='space-y-2'>
-            <button
-              type='button'
-              aria-expanded={!!expanded[result.id]}
-              aria-label={`Ver salida completa de ${result.id}`}
-              onClick={() =>
-                setExpanded((prev) => ({
-                  ...prev,
-                  [result.id]: !prev[result.id],
-                }))
-              }
-              className='flex w-full items-center gap-1 text-start text-xs text-muted-foreground hover:text-foreground'
-              disabled={!hasOutput}
-            >
-              {expanded[result.id] ? (
-                <ChevronDown className='size-3.5' />
-              ) : (
-                <ChevronRight className='size-3.5' />
-              )}
-              <span className='truncate'>
-                {hasOutput ? output : 'Sin salida ni adjuntos'}
-              </span>
-            </button>
-            {expanded[result.id] && hasOutput && (
-              <pre className='max-h-32 overflow-auto rounded-md border bg-muted/20 p-2 text-xs whitespace-pre-wrap'>
-                {output}
-              </pre>
-            )}
-            {attachments.length > 0 && (
-              <div className='flex flex-wrap items-center gap-1.5'>
-                <span className='flex items-center gap-1 text-xs text-muted-foreground'>
-                  <Paperclip className='size-3.5' /> Evidencias (
-                  {attachments.length})
-                </span>
-                {attachments.map((item, index) => (
-                  <AttachmentThumbnail
-                    key={item.id}
-                    item={item}
-                    onOpen={() => openEvidence(result, index)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </TableCell>
-      </TableRow>
+      <ResultRow
+        key={result.id}
+        result={result}
+        isNew={!seenIds.current.has(result.id)}
+        expanded={!!expanded[result.id]}
+        attachments={(result.attachments ?? [])
+          .map((attachment) => toEvidenceItem(attachment, reportId, result))
+          .filter((item): item is EvidenceItem => item !== null)}
+        onToggle={() =>
+          setExpanded((prev) => ({
+            ...prev,
+            [result.id]: !prev[result.id],
+          }))
+        }
+        onOpenEvidence={(index) => openEvidence(result, index)}
+      />
     )
   }
 
@@ -450,6 +402,129 @@ export function ResultsTable({
         }
       />
     </>
+  )
+}
+
+function ResultRow({
+  result,
+  isNew,
+  expanded,
+  attachments,
+  onToggle,
+  onOpenEvidence,
+}: {
+  result: ExecutionTestResult
+  isNew: boolean
+  expanded: boolean
+  attachments: EvidenceItem[]
+  onToggle: () => void
+  onOpenEvidence: (index: number) => void
+}) {
+  const output = result.errorMsg || result.output || ''
+  const hasOutput = !!output.trim()
+  const controls = useAnimationControls()
+  const previousStatus = useRef(result.status)
+  const entered = useRef(false)
+
+  useEffect(() => {
+    if (!isNew || entered.current) return
+    entered.current = true
+    void controls.start({
+      opacity: 1,
+      y: 0,
+      transition: { duration: DURATION.fast, ease: EASE_OUT },
+    })
+  }, [controls, isNew])
+
+  useEffect(() => {
+    const previous = previousStatus.current
+    previousStatus.current = result.status
+    if (!shouldFlashStatus(previous, result.status)) return
+    const background =
+      result.status === 'passed'
+        ? 'rgba(16, 185, 129, 0.24)'
+        : 'rgba(239, 68, 68, 0.24)'
+    void controls.start({
+      backgroundColor: [background, 'rgba(0, 0, 0, 0)'],
+      transition: { duration: 0.6, ease: 'easeOut' },
+    })
+  }, [controls, result.status])
+
+  return (
+    <m.tr
+      data-entry={isNew ? 'new' : 'known'}
+      initial={isNew ? { opacity: 0, y: 3 } : false}
+      animate={controls}
+    >
+      <TableCell className='max-w-[320px]'>
+        <span className='block truncate font-mono text-xs'>
+          {result.id.split('::').slice(1).join(' :: ') || result.id}
+        </span>
+        <span className='block truncate text-xs text-muted-foreground'>
+          {result.id.split('::')[0]}
+        </span>
+      </TableCell>
+      <TableCell>
+        <Badge variant={statusVariant(result.status)}>
+          {statusLabels[result.status] ?? result.status}
+        </Badge>
+      </TableCell>
+      <TableCell className='text-end tabular-nums'>
+        {result.duration !== undefined ? `${result.duration.toFixed(2)}s` : '—'}
+      </TableCell>
+      <TableCell className='max-w-[360px]'>
+        <div className='space-y-2'>
+          <button
+            type='button'
+            aria-expanded={expanded}
+            aria-label={`Ver salida completa de ${result.id}`}
+            onClick={onToggle}
+            className='flex w-full items-center gap-1 text-start text-xs text-muted-foreground hover:text-foreground'
+            disabled={!hasOutput}
+          >
+            {expanded ? (
+              <ChevronDown className='size-3.5' />
+            ) : (
+              <ChevronRight className='size-3.5' />
+            )}
+            <span className='truncate'>
+              {hasOutput ? output : 'Sin salida ni adjuntos'}
+            </span>
+          </button>
+          <AnimatePresence initial={false}>
+            {expanded && hasOutput && (
+              <m.div
+                key='output'
+                variants={collapse}
+                initial='hidden'
+                animate='show'
+                exit='exit'
+                className='overflow-hidden'
+              >
+                <pre className='max-h-32 overflow-auto rounded-md border bg-muted/20 p-2 text-xs whitespace-pre-wrap'>
+                  {output}
+                </pre>
+              </m.div>
+            )}
+          </AnimatePresence>
+          {attachments.length > 0 && (
+            <div className='flex flex-wrap items-center gap-1.5'>
+              <span className='flex items-center gap-1 text-xs text-muted-foreground'>
+                <Paperclip className='size-3.5' /> Evidencias (
+                {attachments.length})
+              </span>
+              {attachments.map((item, index) => (
+                <AttachmentThumbnail
+                  key={item.id}
+                  item={item}
+                  onOpen={() => onOpenEvidence(index)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </TableCell>
+    </m.tr>
   )
 }
 

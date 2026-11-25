@@ -102,6 +102,64 @@ describe('ExecutionConsole', () => {
     expect(onClear).toHaveBeenCalledOnce()
   })
 
+  it('retira las líneas de log de inmediato al limpiar el buffer', () => {
+    const props = {
+      running: true,
+      summary: null,
+      progress: { current: 1, total: 4, percentage: 25 },
+    }
+    const { rerender } = render(
+      <ExecutionConsole
+        {...props}
+        logs={[
+          {
+            id: '1',
+            at: '2026-11-23T10:00:00.000Z',
+            kind: 'info',
+            text: 'evento reciente',
+          },
+        ]}
+      />
+    )
+
+    expect(screen.getByText('evento reciente')).toBeTruthy()
+
+    rerender(<ExecutionConsole {...props} logs={[]} />)
+
+    expect(screen.queryByText('evento reciente')).toBeNull()
+    expect(screen.getByText('Esperando eventos de ejecución…')).toBeTruthy()
+  })
+
+  it('alcanza un hito de progreso sin alterar el valor accesible', () => {
+    const props = {
+      logs: [],
+      running: true,
+      summary: null,
+    }
+    const { rerender } = render(
+      <ExecutionConsole
+        {...props}
+        progress={{ current: 1, total: 4, percentage: 25 }}
+      />
+    )
+
+    expect(screen.getByText('25%')).toBeTruthy()
+
+    rerender(
+      <ExecutionConsole
+        {...props}
+        progress={{ current: 2, total: 4, percentage: 50 }}
+      />
+    )
+
+    expect(screen.getByText('50%')).toBeTruthy()
+    const progress = screen.getByRole('progressbar', {
+      name: 'Progreso de la ejecución',
+    })
+    expect(progress.getAttribute('aria-valuenow')).toBe('50')
+    expect(progress.getAttribute('aria-valuetext')).toBe('2 de 4 tests, 50%')
+  })
+
   it('muestra error de catálogo con reintento y estado de carga', () => {
     const onRetry = vi.fn()
     render(

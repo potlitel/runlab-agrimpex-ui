@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import type { TestTree } from '@/types/contract'
 import { Play, Square } from 'lucide-react'
-import { envApi, profilesApi } from '@/lib/api'
+import { AnimatePresence, m } from 'motion/react'
 import { useProfileStore } from '@/stores/profileStore'
+import { envApi, profilesApi } from '@/lib/api'
+import { fadeIn } from '@/lib/motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -17,8 +20,8 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { AnimatedNumber } from '@/components/motion/animated-number'
 import type { RunOptions } from '../use-execution'
-import type { TestTree } from '@/types/contract'
 
 type RunControlsProps = {
   tree?: TestTree
@@ -168,8 +171,12 @@ export function RunControls({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value='none'>Por defecto del proyecto</SelectItem>
-                  <SelectItem value='file'>Archivo .env del proyecto</SelectItem>
-                  <SelectItem value='saved'>Entorno guardado del perfil</SelectItem>
+                  <SelectItem value='file'>
+                    Archivo .env del proyecto
+                  </SelectItem>
+                  <SelectItem value='saved'>
+                    Entorno guardado del perfil
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -267,7 +274,26 @@ export function RunControls({
           <div className='flex items-center gap-2'>
             <Button type='submit' disabled={selected.length === 0 || running}>
               <Play className='size-4' />
-              {runPending ? 'Iniciando…' : `Ejecutar ${selected.length || ''} test${selected.length === 1 ? '' : 's'}`}
+              <AnimatePresence mode='wait' initial={false}>
+                <m.span
+                  key={runPending ? 'pending' : 'idle'}
+                  variants={fadeIn}
+                  initial='hidden'
+                  animate='show'
+                  exit='exit'
+                >
+                  {runPending ? (
+                    'Iniciando…'
+                  ) : selected.length > 0 ? (
+                    <>
+                      Ejecutar <AnimatedNumber value={selected.length} /> test
+                      {selected.length === 1 ? '' : 's'}
+                    </>
+                  ) : (
+                    'Ejecutar tests'
+                  )}
+                </m.span>
+              </AnimatePresence>
             </Button>
             <Button
               type='button'
@@ -276,14 +302,33 @@ export function RunControls({
               disabled={!running || abortPending}
             >
               <Square className='size-4' />
-              Abortar
+              <AnimatePresence mode='wait' initial={false}>
+                <m.span
+                  key={abortPending ? 'pending' : 'idle'}
+                  variants={fadeIn}
+                  initial='hidden'
+                  animate='show'
+                  exit='exit'
+                >
+                  {abortPending ? 'Abortando…' : 'Abortar'}
+                </m.span>
+              </AnimatePresence>
             </Button>
           </div>
-          {selected.length === 0 && (
-            <p className='text-xs text-muted-foreground'>
-              Selecciona al menos un test en el catálogo.
-            </p>
-          )}
+          <AnimatePresence initial={false}>
+            {selected.length === 0 && (
+              <m.p
+                key='selection-hint'
+                variants={fadeIn}
+                initial='hidden'
+                animate='show'
+                exit='exit'
+                className='text-xs text-muted-foreground'
+              >
+                Selecciona al menos un test en el catálogo.
+              </m.p>
+            )}
+          </AnimatePresence>
         </form>
       </CardContent>
     </Card>
