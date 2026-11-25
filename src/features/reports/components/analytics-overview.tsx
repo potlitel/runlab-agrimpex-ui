@@ -198,7 +198,7 @@ export function AnalyticsOverview({ analytics, loading, error }: AnalyticsOvervi
                   />
                   <Tooltip
                     content={<ChartTooltip />}
-                    cursor={{ fill: 'hsl(var(--muted) / 0.35)' }}
+                    cursor={{ fill: 'transparent' }}
                     wrapperStyle={{ outline: 'none' }}
                   />
                   <Bar
